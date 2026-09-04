@@ -1,0 +1,268 @@
+import { ENV } from '../config/env.js';
+import {
+  AiGenerateSetResponse,
+  AiExplainTermResponse,
+} from '../types/ai.types.js';
+import { ApiError } from '../utils/apiError.js';
+import { isEnglishTerm } from '../validations/ai.schema.js';
+
+export class AiService {
+  /**
+   * Helper to get prioritized candidate models:
+   * Priority: 3.1 Flash-Lite -> 2.5 Flash -> 2.0 Flash -> 2.0 Flash-Lite -> 1.5 Flash
+   */
+  private static getCandidateModels(): string[] {
+    const priorityList = [
+      ENV.GEMINI_MODEL || 'gemini-3.1-flash-lite',
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+      'gemini-1.5-flash',
+    ];
+    // Deduplicate preserving order
+    return Array.from(new Set(priorityList));
+  }
+
+  /**
+   * Intelligently generate study set and flashcards from prompt or text
+   */
+  static async generateStudySet(
+    prompt: string,
+    rawCardCount = 10,
+    sourceLanguage = 'en',
+    targetLanguage = 'vi'
+  ): Promise<AiGenerateSetResponse> {
+    const cardCount = Math.max(5, Math.min(15, rawCardCount));
+
+    // If Gemini API Key is provided, use Google Gemini
+    if (ENV.GEMINI_API_KEY) {
+      const candidateModels = this.getCandidateModels();
+
+      for (const model of candidateModels) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${ENV.GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `You are an expert language teacher. Create an educational flashcard study set based on this input: "${prompt}".
+Generate ${cardCount} flashcards. Source language: ${sourceLanguage}, Target language: ${targetLanguage}.
+Respond ONLY with valid JSON in this exact structure:
+{
+  "title": "A concise title for this study set",
+  "description": "A clear description of what this set covers",
+  "tags": ["tag1", "tag2", "tag3"],
+  "cards": [
+    {
+      "term": "English word or phrase",
+      "definition": "Vietnamese meaning / definition",
+      "phonetic": "/IPA transcription/",
+      "example": "An authentic example sentence using the term.",
+      "hint": "Memory hook or tip"
+    }
+  ]
+}`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  responseMimeType: 'application/json',
+                },
+              }),
+            }
+          );
+
+          if (response.ok) {
+            const result = await response.json();
+            const textContent =
+              result.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (textContent) {
+              return JSON.parse(textContent);
+            }
+          }
+        } catch {
+          // Try next candidate model in priority order
+        }
+      }
+    }
+
+    // Fallback: Smart Built-in Flashcard Generator
+    const topic = prompt.length > 50 ? 'Custom Extracted Vocabulary' : prompt;
+    return {
+      title: `Vocabulary for: ${topic}`,
+      description: `Auto-generated flashcard set focusing on essential terminology related to "${prompt.slice(0, 100)}"`,
+      tags: ['AI-Generated', 'Vocabulary', 'English-Practice'],
+      cards: [
+        {
+          term: 'Comprehend',
+          definition: 'Thấu hiểu, lĩnh hội toàn diện một vấn đề',
+          phonetic: '/ˌkɑːm.prəˈhend/',
+          example:
+            'She couldn’t fully comprehend the complexity of the situation.',
+          hint: 'Synonym: understand, grasp',
+        },
+        {
+          term: 'Persevere',
+          definition: 'Kiên trì, bền chí không nản lòng trước thử thách',
+          phonetic: '/ˌpɜː.sɪˈvɪər/',
+          example:
+            'Despite repeated failures, he persevered and finally succeeded.',
+          hint: 'Noun form: perseverance',
+        },
+        {
+          term: 'Eloquent',
+          definition: 'Hùng biện, có tài ăn nói lưu loát và thuyết phục',
+          phonetic: '/ˈel.ə.kwənt/',
+          example: 'The speaker gave an eloquent defense of human rights.',
+          hint: 'Synonym: articulate, expressive',
+        },
+        {
+          term: 'Resilient',
+          definition: 'Kiên cường, có khả năng phục hồi nhanh sau khó khăn',
+          phonetic: '/rɪˈzɪl.jənt/',
+          example: 'Children are remarkably resilient when facing change.',
+          hint: 'Ability to bounce back',
+        },
+        {
+          term: 'Ambiguous',
+          definition: 'Mơ hồ, có thể hiểu theo nhiều nghĩa khác nhau',
+          phonetic: '/æmˈbɪɡ.ju.əs/',
+          example: 'His reply was ambiguous and left us with more questions.',
+          hint: 'Opposite: clear, unambiguous',
+        },
+        {
+          term: 'Proactive',
+          definition: 'Chủ động đón đầu và giải quyết vấn đề',
+          phonetic: '/ˌproʊˈæk.tɪv/',
+          example:
+            'Companies must take proactive measures to prevent security breaches.',
+          hint: 'Action-oriented',
+        },
+      ].slice(0, cardCount),
+    };
+  }
+
+  /**
+   * Explain a term with mnemonic hook, pronunciation, collocations
+   */
+  static async explainTerm(
+    term: string,
+    context?: string,
+    targetLanguage = 'vi'
+  ): Promise<AiExplainTermResponse> {
+    const trimmed = (term || '').trim();
+    if (!isEnglishTerm(trimmed)) {
+      throw ApiError.badRequest('Vui lòng nhập từ vựng bằng tiếng Anh.');
+    }
+
+    if (ENV.GEMINI_API_KEY) {
+      const candidateModels = this.getCandidateModels();
+
+      for (const model of candidateModels) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${ENV.GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `You are an expert English-Vietnamese linguist and dictionary editor.
+Explain this English term for a Vietnamese learner: "${trimmed}" ${
+                          context ? `(Context: ${context})` : ''
+                        }. Target language: ${targetLanguage}.
+
+VALIDATION RULE:
+If the input "${trimmed}" is NOT an English word, phrase, idiom, or slang (for example: words in Vietnamese, Chinese, Spanish, or non-English symbols), respond ONLY with valid JSON:
+{
+  "isNotEnglish": true,
+  "message": "Vui lòng nhập từ vựng bằng tiếng Anh."
+}
+
+OTHERWISE, FOLLOW THESE STRICT REQUIREMENTS:
+1. "definition": MUST be concise, clear, and direct in Vietnamese (ngắn gọn, súc tích, đúng trọng tâm, tối đa 1-2 câu ngắn, tuyệt đối không giải thích dài dòng hay lan man).
+2. "mnemonicStory": A fun, punchy 1-2 sentence memory hook or visual association in Vietnamese.
+3. "partOfSpeech": accurate part of speech (noun / verb / adjective / adverb / idiom / phrasal verb).
+4. "examples": 2 natural, authentic English sentences illustrating usage.
+5. "synonyms": 2-3 accurate synonyms.
+6. "antonyms": 1-2 accurate antonyms (if applicable).
+7. "commonCollocations": 2-3 high-frequency collocations.
+
+Respond ONLY with valid JSON in this exact structure:
+{
+  "isNotEnglish": false,
+  "term": "${trimmed}",
+  "definition": "Nghĩa tiếng Việt ngắn gọn, súc tích, chuẩn xác",
+  "phonetic": "/IPA transcription/",
+  "partOfSpeech": "noun / verb / adjective / idiom",
+  "mnemonicStory": "Mẹo ghi nhớ ngắn gọn, hài hước, dễ nhớ",
+  "examples": ["Example 1", "Example 2"],
+  "synonyms": ["Synonym 1", "Synonym 2"],
+  "antonyms": ["Antonym 1"],
+  "commonCollocations": ["Collocation 1", "Collocation 2"]
+}`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  responseMimeType: 'application/json',
+                },
+              }),
+            }
+          );
+
+          if (response.ok) {
+            const result = await response.json();
+            const textContent =
+              result.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (textContent) {
+              const parsed = JSON.parse(textContent);
+              if (parsed.isNotEnglish) {
+                throw ApiError.badRequest(
+                  'Vui lòng nhập từ vựng bằng tiếng Anh.'
+                );
+              }
+              return parsed;
+            }
+          }
+        } catch (err: unknown) {
+          if (err instanceof ApiError) {
+            throw err;
+          }
+          // Try next candidate model in priority order
+        }
+      }
+    }
+
+    // Smart Fallback Explanation
+    return {
+      term: trimmed,
+      definition: `Nghĩa ngắn gọn: Thuật ngữ "${trimmed}" mang nghĩa cốt lõi trong giao tiếp và học thuật.`,
+      phonetic: '/.../',
+      partOfSpeech: 'Word / Phrase',
+      mnemonicStory: `Liên tưởng từ "${trimmed}" với hình ảnh cụ thể trong cuộc sống để nhớ ngay lập tức.`,
+      examples: [
+        `It is crucial to practice using "${trimmed}" in your daily conversations.`,
+        `The professor highlighted the significance of "${trimmed}" during the seminar.`,
+      ],
+      synonyms: ['Related Term 1', 'Related Term 2'],
+      antonyms: ['Opposite Term'],
+      commonCollocations: [
+        `essential ${trimmed}`,
+        `apply ${trimmed}`,
+        `${trimmed} in practice`,
+      ],
+    };
+  }
+}

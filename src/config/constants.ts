@@ -1,0 +1,51 @@
+export enum UserRole {
+  USER = 'USER',
+  ADMIN = 'ADMIN',
+}
+
+export enum PrivacyLevel {
+  PUBLIC = 'PUBLIC',
+  PRIVATE = 'PRIVATE',
+  PASSWORD = 'PASSWORD',
+  UNLISTED = 'UNLISTED',
+}
+
+export enum CardStudyStatus {
+  NOT_STUDIED = 'NOT_STUDIED',
+  LEARNING = 'LEARNING',
+  MASTERED = 'MASTERED',
+}
+
+export enum StudyMode {
+  FLASHCARDS = 'FLASHCARDS',
+  LEARN = 'LEARN',
+  WRITE = 'WRITE',
+  TEST = 'TEST',
+  MATCH = 'MATCH',
+}
+
+export enum QuestionType {
+  MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
+  TRUE_FALSE = 'TRUE_FALSE',
+  WRITTEN = 'WRITTEN',
+  MATCHING = 'MATCHING',
+}
+
+export enum ClassRole {
+  ADMIN = 'ADMIN',
+  MEMBER = 'MEMBER',
+}
+
+export const HTTP_STATUS = {
+  OK: 200,
+  CREATED: 201,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  UNPROCESSABLE_ENTITY: 422,
+  TOO_MANY_REQUESTS: 429,
+  INTERNAL_SERVER_ERROR: 500,
+} as const;
