@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import { connectDatabase, disconnectDatabase } from '../db/mongo.js';
 import { UserModel } from '../models/User.model.js';
 
+// You may need it :D
+
 async function main() {
   console.log('🔄 Connecting to database...');
   const conn = await connectDatabase();
