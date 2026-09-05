@@ -184,7 +184,7 @@ npm start
 
 ## 7. Hướng Dẫn Deploy Backend (Render & Railway)
 
-### 🟢 Cách 1: Deploy lên Render.com (Miễn phí & Phổ biến nhất)
+### 🟢 Deploy lên Render.com
 1. Đăng ký/Đăng nhập [Render.com](https://render.com).
 2. Nhấn **New +** ➔ Chọn **Web Service**.
 3. Kết nối với Repository GitHub của bạn.
@@ -204,10 +204,3 @@ npm start
    - `GMAIL_USER`: `<Gmail_gui_mail>`
    - `GMAIL_APP_PASSWORD`: `<Mat_khau_ung_dung_16_ky_tu>`
 6. Nhấn **Create Web Service**. Sau khi deploy xong, bạn sẽ có Web Service URL dạng: `https://lexiflash-backend.onrender.com`.
-
-### 🟣 Cách 2: Deploy lên Railway.app
-1. Đăng nhập [Railway.app](https://railway.app).
-2. Tạo **New Project** ➔ Chọn **Deploy from GitHub repo**.
-3. Chọn repo `lexiflash`, cấu hình **Root Directory** là `/server`.
-4. Thiết lập **Variables** đầy đủ giống như Render.
-5. Railway sẽ tự động phát hiện `package.json`, chạy `npm run build` và khởi chạy `npm start`.
