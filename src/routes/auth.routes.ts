@@ -21,12 +21,12 @@ const loginLimiter = createRateLimiter({
   message: 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau 15 phút!',
 });
 
-// Anti spam for registration: 5 accounts per hour per IP
+// Anti spam for registration: 15 attempts per 15 minutes per IP
 const registerLimiter = createRateLimiter({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
+  windowMs: 15 * 60 * 1000,
+  max: 15,
   message:
-    'Quá nhiều lượt đăng ký từ địa chỉ mạng của bạn. Vui lòng thử lại sau 1 giờ!',
+    'Bạn đã thử đăng ký quá 15 lần. Vui lòng thử lại sau 15 phút!',
 });
 
 // Anti email spam for password reset: 5 requests per 15 minutes
@@ -48,6 +48,12 @@ router.post(
   loginLimiter,
   validate(loginSchema),
   AuthController.login
+);
+router.post(
+  '/admin-login',
+  loginLimiter,
+  validate(loginSchema),
+  AuthController.adminLogin
 );
 router.post(
   '/refresh-token',

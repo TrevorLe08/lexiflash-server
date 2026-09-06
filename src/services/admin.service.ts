@@ -7,13 +7,20 @@ import {
 } from '../config/constants.js';
 import { User, StreakStatus } from '../types/user.types.js';
 import { StudySetWithDetails } from '../types/studySet.types.js';
+import { FolderWithDetails } from '../types/folder.types.js';
 import { ClassWithDetails } from '../types/class.types.js';
 import { StudySetService } from './studySet.service.js';
+import { FolderService } from './folder.service.js';
 import { ClassService } from './class.service.js';
 import { StreakService } from './streak.service.js';
 import { ApiError } from '../utils/apiError.js';
 import { paginateArray, PaginatedResult } from '../utils/pagination.js';
 import { isUserVip, countUserTotalCards } from '../utils/user.utils.js';
+import {
+  BannerNotificationConfig,
+  BannerColor,
+  MaintenanceConfig,
+} from '../types/system.types.js';
 
 export interface AdminUserListItem {
   id: string;
@@ -683,4 +690,146 @@ export class AdminService {
     await mockDb.saveFeaturedTopics(finalTopics);
     return finalTopics;
   }
+
+  /**
+   * Get the current top banner notification configuration
+   */
+  static async getBannerNotification(): Promise<BannerNotificationConfig> {
+    return { ...mockDb.bannerNotification };
+  }
+
+  /**
+   * Update the top banner notification configuration
+   */
+  static async updateBannerNotification(data: {
+    isEnabled: boolean;
+    message: string;
+    color: BannerColor;
+    linkUrl?: string;
+    linkText?: string;
+  }): Promise<BannerNotificationConfig> {
+    const current = mockDb.bannerNotification;
+
+    const isContentChanged =
+      current.message !== data.message || current.color !== data.color;
+
+    const updatedBanner: BannerNotificationConfig = {
+      id: isContentChanged ? `banner_${Date.now()}` : current.id,
+      isEnabled: Boolean(data.isEnabled),
+      message: (data.message || '').trim(),
+      color: data.color || 'blue',
+      linkUrl: data.linkUrl ? data.linkUrl.trim() : '',
+      linkText: data.linkText ? data.linkText.trim() : '',
+      updatedAt: new Date().toISOString(),
+    };
+
+    return await mockDb.saveBannerNotification(updatedBanner);
+  }
+
+  /**
+   * 9. Paginated Folders List for Content Moderation & Featured Management
+   */
+  static async getAllFolders(options: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    privacy?: PrivacyLevel;
+    isFeatured?: boolean;
+  }): Promise<PaginatedResult<FolderWithDetails>> {
+    const { page = 1, limit = 10, search = '', privacy, isFeatured } = options;
+
+    let folders = Array.from(mockDb.folders.values());
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      folders = folders.filter(
+        (f) =>
+          f.title.toLowerCase().includes(q) ||
+          (f.description && f.description.toLowerCase().includes(q))
+      );
+    }
+
+    if (privacy) {
+      folders = folders.filter((f) => f.privacy === privacy);
+    }
+
+    if (typeof isFeatured === 'boolean') {
+      folders = folders.filter((f) => Boolean(f.isFeatured) === isFeatured);
+    }
+
+    folders.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    const paginated = paginateArray(folders, page, limit);
+
+    const populatedItems = paginated.items.map((f) =>
+      FolderService.populateFolderDetails(f)
+    );
+
+    return {
+      ...paginated,
+      items: populatedItems,
+    };
+  }
+
+  /**
+   * 10. Toggle Featured Badge on Folder
+   */
+  static async toggleFeaturedFolder(
+    folderId: string,
+    isFeatured: boolean
+  ): Promise<FolderWithDetails> {
+    const folder = mockDb.folders.get(folderId);
+    if (!folder) {
+      throw ApiError.notFound('Folder not found');
+    }
+
+    folder.isFeatured = isFeatured;
+    folder.updatedAt = new Date().toISOString();
+    mockDb.folders.set(folder.id, folder);
+
+    return FolderService.populateFolderDetails(folder);
+  }
+
+  /**
+   * 11. Delete Folder by Admin (Content Moderation)
+   */
+  static async deleteFolder(folderId: string): Promise<void> {
+    const folder = mockDb.folders.get(folderId);
+    if (!folder) {
+      throw ApiError.notFound('Folder not found');
+    }
+    mockDb.folders.delete(folderId);
+  }
+
+  /**
+   * 12. Get System Maintenance Configuration
+   */
+  static async getMaintenanceConfig(): Promise<MaintenanceConfig> {
+    return { ...mockDb.maintenanceConfig };
+  }
+
+  /**
+   * 13. Update System Maintenance Configuration
+   */
+  static async updateMaintenanceConfig(data: {
+    isActive: boolean;
+    title: string;
+    message: string;
+    estimatedEndTime?: string;
+  }): Promise<MaintenanceConfig> {
+    const updated = await mockDb.saveMaintenanceConfig({
+      isActive: Boolean(data.isActive),
+      title: (data.title || '').trim() || 'Hệ thống đang bảo trì nâng cấp',
+      message:
+        (data.message || '').trim() ||
+        'LexiFlash đang thực hiện bảo trì định kỳ. Xin vui lòng quay lại sau!',
+      estimatedEndTime: (data.estimatedEndTime || '').trim(),
+      updatedAt: new Date().toISOString(),
+    });
+    return updated;
+  }
 }
+

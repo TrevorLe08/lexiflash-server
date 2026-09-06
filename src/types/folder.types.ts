@@ -7,6 +7,7 @@ export interface Folder {
   description?: string;
   creatorId: string;
   privacy?: PrivacyLevel;
+  isFeatured?: boolean;
   studySetIds: string[];
   createdAt: string;
   updatedAt: string;

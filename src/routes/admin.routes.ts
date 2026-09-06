@@ -3,6 +3,10 @@ import { AdminController } from '../controllers/admin.controller.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
 import { updateUserRoleSchema } from '../validations/user.schema.js';
+import {
+  updateBannerNotificationSchema,
+  updateMaintenanceSchema,
+} from '../validations/system.schema.js';
 import { UserRole } from '../config/constants.js';
 
 const router = Router();
@@ -35,5 +39,26 @@ router.get('/groups', AdminController.getAllStudyGroups);
 // Featured Topics (Homepage tags)
 router.get('/featured-topics', AdminController.getFeaturedTopics);
 router.put('/featured-topics', AdminController.updateFeaturedTopics);
+
+// Top Banner Notification
+router.get('/banner', AdminController.getBannerNotification);
+router.put(
+  '/banner',
+  validate(updateBannerNotificationSchema),
+  AdminController.updateBannerNotification
+);
+
+// Folders Moderation & Featured Management
+router.get('/folders', AdminController.getFolders);
+router.patch('/folders/:id/featured', AdminController.toggleFeaturedFolder);
+router.delete('/folders/:id', AdminController.deleteFolder);
+
+// System Maintenance Mode
+router.get('/maintenance', AdminController.getMaintenance);
+router.put(
+  '/maintenance',
+  validate(updateMaintenanceSchema),
+  AdminController.updateMaintenance
+);
 
 export default router;

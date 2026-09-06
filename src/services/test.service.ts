@@ -262,8 +262,15 @@ export class TestService {
 
       let isCorrect = false;
       if (q.type === QuestionType.TRUE_FALSE) {
-        isCorrect =
-          rawUserAnswer.toLowerCase() === q.correctAnswer.toLowerCase();
+        const normalizeTf = (val: string): 'true' | 'false' | null => {
+          const s = val.trim().toLowerCase();
+          if (['true', 't', 'đúng', 'dung', 'yes', '1'].includes(s)) return 'true';
+          if (['false', 'f', 'sai', 'no', '0'].includes(s)) return 'false';
+          return null;
+        };
+        const userNorm = normalizeTf(rawUserAnswer);
+        const correctNorm = normalizeTf(q.correctAnswer);
+        isCorrect = userNorm !== null && userNorm === correctNorm;
       } else if (q.type === QuestionType.WRITTEN) {
         // Case-insensitive normalized match
         isCorrect =

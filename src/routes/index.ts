@@ -11,6 +11,7 @@ import matchRoutes from './match.routes.js';
 import aiRoutes from './ai.routes.js';
 import searchRoutes from './search.routes.js';
 import adminRoutes from './admin.routes.js';
+import systemRoutes from './system.routes.js';
 import { studyRoomRoutes } from './studyRoom.routes.js';
 
 const apiRouter = Router();
@@ -28,5 +29,6 @@ apiRouter.use('/match', matchRoutes);
 apiRouter.use('/ai', aiRoutes);
 apiRouter.use('/search', searchRoutes);
 apiRouter.use('/admin', adminRoutes);
+apiRouter.use('/system', systemRoutes);
 
 export default apiRouter;

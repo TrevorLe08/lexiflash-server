@@ -39,6 +39,18 @@ export const authenticate = (
       );
     }
 
+    if (
+      mockDb.maintenanceConfig?.isActive &&
+      user.role !== UserRole.ADMIN &&
+      !req.path.endsWith('/me')
+    ) {
+      return next(
+        ApiError.forbidden(
+          'Hệ thống đang trong chế độ bảo trì. Chỉ Quản trị viên mới có thể thực hiện thao tác.'
+        )
+      );
+    }
+
     req.user = payload;
     next();
   } catch (error: unknown) {

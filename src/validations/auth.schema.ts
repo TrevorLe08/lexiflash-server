@@ -5,7 +5,7 @@ export const registerSchema = z.object({
     email: z.string().email('Invalid email format'),
     username: z
       .string()
-      .min(3, 'Username must be at least 3 characters')
+      .min(2, 'Username must be at least 2 characters')
       .max(30, 'Username must not exceed 30 characters')
       .regex(
         /^[a-zA-Z0-9_]+$/,
@@ -21,7 +21,7 @@ export const registerSchema = z.object({
         /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/,
         'Password must contain at least one special character (!@#$%^&*...)'
       ),
-    name: z.string().min(1, 'Name is required').max(100),
+    name: z.string().min(2, 'Name must be at least 2 characters').max(100),
     avatarUrl: z.string().url().optional(),
     bio: z.string().max(300).optional(),
   }),

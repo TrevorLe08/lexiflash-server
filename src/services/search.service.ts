@@ -316,11 +316,20 @@ export class SearchService {
         ? [...mockDb.featuredTopics]
         : [...DEFAULT_FEATURED_TOPICS];
 
+    // 5. Featured folders specifically marked as isFeatured by Admin
+    const allPublicFolders = Array.from(mockDb.folders.values()).filter(
+      (f) => f.privacy === PrivacyLevel.PUBLIC || !f.privacy
+    );
+    const featuredFolders = allPublicFolders
+      .filter((f) => Boolean(f.isFeatured))
+      .map((f) => FolderService.populateFolderDetails(f));
+
     return {
       trendingSets: trendingSets.slice(0, 6),
       featuredSets: featuredSets.slice(0, 6),
       recentSets: recentSets.slice(0, 6),
       popularTags,
+      featuredFolders: featuredFolders.slice(0, 6),
     };
   }
 }

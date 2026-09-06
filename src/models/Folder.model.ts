@@ -18,6 +18,7 @@ const folderSchema = new Schema<FolderDocument>(
       default: PrivacyLevel.PUBLIC,
     },
     studySetIds: { type: [String], default: [] },
+    isFeatured: { type: Boolean, default: false, index: true },
   },
   {
     timestamps: true,

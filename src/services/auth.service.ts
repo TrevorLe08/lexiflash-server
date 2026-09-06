@@ -33,8 +33,14 @@ export class AuthService {
     accessToken: string;
     refreshToken: string;
   }> {
-    const email = input.email.toLowerCase();
-    const username = input.username.toLowerCase();
+    if (mockDb.maintenanceConfig?.isActive) {
+      throw ApiError.forbidden(
+        'Hệ thống đang trong chế độ bảo trì. Không thể đăng ký tài khoản mới vào lúc này.'
+      );
+    }
+
+    const email = input.email.toLowerCase().trim();
+    const username = input.username.toLowerCase().trim();
 
     // Check unique email
     for (const u of mockDb.users.values()) {
@@ -157,6 +163,12 @@ export class AuthService {
       throw ApiError.unauthorized('Invalid email/username or password');
     }
 
+    if (mockDb.maintenanceConfig?.isActive && foundUser.role !== UserRole.ADMIN) {
+      throw ApiError.forbidden(
+        'Hệ thống đang trong chế độ bảo trì. Chỉ Quản trị viên mới có thể đăng nhập vào lúc này. Vui lòng quay lại sau!'
+      );
+    }
+
     // Dynamic streak calculation without false login-increment
     const streakInfo = StreakService.calculateStreakStatus(foundUser);
 
@@ -170,6 +182,97 @@ export class AuthService {
     const refreshToken = signRefreshToken(tokenPayload);
 
     // Save refresh token
+    const refreshTokenRecord: RefreshToken = {
+      id: generateId('rtk'),
+      token: refreshToken,
+      userId: foundUser.id,
+      expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    mockDb.refreshTokens.set(refreshTokenRecord.id, refreshTokenRecord);
+
+    const userProfile: UserProfileResponse = {
+      id: foundUser.id,
+      email: foundUser.email,
+      username: foundUser.username,
+      name: foundUser.name,
+      avatarUrl: foundUser.avatarUrl,
+      bio: foundUser.bio,
+      role: foundUser.role,
+      isBanned: foundUser.isBanned,
+      isVip: isUserVip(foundUser),
+      vipExpiresAt: foundUser.vipExpiresAt || null,
+      vipPlan: foundUser.vipPlan || null,
+      streakCount: streakInfo.streakCount,
+      lastStudyDate: streakInfo.lastStudyDate,
+      isStreakActiveToday: streakInfo.isStreakActiveToday,
+      isStreakAtRisk: streakInfo.isStreakAtRisk,
+      streakStatus: streakInfo.streakStatus,
+      createdAt: foundUser.createdAt,
+    };
+
+    return { user: userProfile, accessToken, refreshToken };
+  }
+
+  static async adminLogin(input: {
+    loginIdentifier?: string;
+    username?: string;
+    email?: string;
+    password: string;
+  }): Promise<{
+    user: UserProfileResponse;
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    const rawId = input.loginIdentifier || input.username || input.email || '';
+    const identifier = rawId.trim().toLowerCase();
+    let foundUser: User | undefined;
+
+    for (const u of mockDb.users.values()) {
+      if (
+        u.email.toLowerCase() === identifier ||
+        u.username.toLowerCase() === identifier
+      ) {
+        foundUser = u;
+        break;
+      }
+    }
+
+    if (!foundUser) {
+      throw ApiError.unauthorized('Invalid email/username or password');
+    }
+
+    if (foundUser.isBanned) {
+      throw ApiError.forbidden(
+        'Your account has been suspended by an administrator. Please contact support.'
+      );
+    }
+
+    const isMatch = await comparePassword(
+      input.password,
+      foundUser.passwordHash
+    );
+    if (!isMatch) {
+      throw ApiError.unauthorized('Invalid email/username or password');
+    }
+
+    if (foundUser.role !== UserRole.ADMIN) {
+      throw ApiError.forbidden(
+        'Tài khoản này không có quyền Quản trị viên. Bạn không thể đăng nhập qua cổng này.'
+      );
+    }
+
+    const streakInfo = StreakService.calculateStreakStatus(foundUser);
+
+    const tokenPayload: TokenPayload = {
+      userId: foundUser.id,
+      email: foundUser.email,
+      role: foundUser.role,
+    };
+
+    const accessToken = signAccessToken(tokenPayload);
+    const refreshToken = signRefreshToken(tokenPayload);
+
     const refreshTokenRecord: RefreshToken = {
       id: generateId('rtk'),
       token: refreshToken,
@@ -297,6 +400,12 @@ export class AuthService {
   }
 
   static async forgotPassword(email: string): Promise<void> {
+    if (mockDb.maintenanceConfig?.isActive) {
+      throw ApiError.forbidden(
+        'Hệ thống đang trong chế độ bảo trì. Không thể yêu cầu đặt lại mật khẩu vào lúc này.'
+      );
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
     let user: User | null = null;
     for (const u of mockDb.users.values()) {
@@ -343,6 +452,11 @@ export class AuthService {
     email: string;
     newPassword: string;
   }): Promise<void> {
+    if (mockDb.maintenanceConfig?.isActive) {
+      throw ApiError.forbidden(
+        'Hệ thống đang trong chế độ bảo trì. Không thể đặt lại mật khẩu vào lúc này.'
+      );
+    }
     const normalizedEmail = input.email.toLowerCase().trim();
     let user: User | null = null;
     for (const u of mockDb.users.values()) {

@@ -8,6 +8,12 @@ import { DailyQuest, StudyRoomSession } from '../types/studyRoom.types.js';
 import { TestHistory } from '../types/test.types.js';
 import { MatchLeaderboardEntry } from '../types/match.types.js';
 import { CardStudyStatus, StudyMode } from '../config/constants.js';
+import {
+  BannerNotificationConfig,
+  DEFAULT_BANNER_NOTIFICATION,
+  MaintenanceConfig,
+  DEFAULT_MAINTENANCE_CONFIG,
+} from '../types/system.types.js';
 
 import { initialUsersSeed } from './seeds/users.seed.js';
 import {
@@ -129,6 +135,12 @@ class MockDatabase {
   public matchLeaderboards: SyncedMap<MatchLeaderboardEntry> =
     new SyncedMap<MatchLeaderboardEntry>(MatchLeaderboardModel);
   public featuredTopics: string[] = [...DEFAULT_FEATURED_TOPICS];
+  public bannerNotification: BannerNotificationConfig = {
+    ...DEFAULT_BANNER_NOTIFICATION,
+  };
+  public maintenanceConfig: MaintenanceConfig = {
+    ...DEFAULT_MAINTENANCE_CONFIG,
+  };
 
   constructor() {
     this.seedDefaults();
@@ -136,6 +148,8 @@ class MockDatabase {
 
   public seedDefaults() {
     this.featuredTopics = [...DEFAULT_FEATURED_TOPICS];
+    this.bannerNotification = { ...DEFAULT_BANNER_NOTIFICATION };
+    this.maintenanceConfig = { ...DEFAULT_MAINTENANCE_CONFIG };
     this.users.clear();
     this.refreshTokens.clear();
     this.studySets.clear();
@@ -286,6 +300,8 @@ class MockDatabase {
         tests,
         leaderboards,
         featuredTopicsSetting,
+        bannerNotificationSetting,
+        maintenanceSetting,
       ] = await Promise.all([
         UserModel.find().lean(),
         StudySetModel.find().lean(),
@@ -298,6 +314,8 @@ class MockDatabase {
         TestHistoryModel.find().lean(),
         MatchLeaderboardModel.find().lean(),
         SystemSettingModel.findOne({ key: 'featuredTopics' }).lean(),
+        SystemSettingModel.findOne({ key: 'bannerNotification' }).lean(),
+        SystemSettingModel.findOne({ key: 'maintenanceConfig' }).lean(),
       ]);
 
       if (
@@ -306,6 +324,28 @@ class MockDatabase {
         (featuredTopicsSetting as any).value.length > 0
       ) {
         this.featuredTopics = [...(featuredTopicsSetting as any).value];
+      }
+
+      if (
+        bannerNotificationSetting &&
+        (bannerNotificationSetting as any).value &&
+        typeof (bannerNotificationSetting as any).value === 'object'
+      ) {
+        this.bannerNotification = {
+          ...DEFAULT_BANNER_NOTIFICATION,
+          ...(bannerNotificationSetting as any).value,
+        };
+      }
+
+      if (
+        maintenanceSetting &&
+        (maintenanceSetting as any).value &&
+        typeof (maintenanceSetting as any).value === 'object'
+      ) {
+        this.maintenanceConfig = {
+          ...DEFAULT_MAINTENANCE_CONFIG,
+          ...(maintenanceSetting as any).value,
+        };
       }
 
       this.users.clear();
@@ -397,7 +437,7 @@ class MockDatabase {
         await SystemSettingModel.findOneAndUpdate(
           { key: 'featuredTopics' },
           { key: 'featuredTopics', value: this.featuredTopics },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
       } catch (err: any) {
         console.error(
@@ -407,6 +447,48 @@ class MockDatabase {
       }
     }
     return this.featuredTopics;
+  }
+
+  public async saveBannerNotification(
+    banner: BannerNotificationConfig
+  ): Promise<BannerNotificationConfig> {
+    this.bannerNotification = { ...banner };
+    if (isMongoConnected()) {
+      try {
+        await SystemSettingModel.findOneAndUpdate(
+          { key: 'bannerNotification' },
+          { key: 'bannerNotification', value: this.bannerNotification },
+          { upsert: true, returnDocument: 'after' }
+        );
+      } catch (err: any) {
+        console.error(
+          '[MongoSync] Error saving bannerNotification setting:',
+          err.message
+        );
+      }
+    }
+    return this.bannerNotification;
+  }
+
+  public async saveMaintenanceConfig(
+    config: MaintenanceConfig
+  ): Promise<MaintenanceConfig> {
+    this.maintenanceConfig = { ...config, updatedAt: new Date().toISOString() };
+    if (isMongoConnected()) {
+      try {
+        await SystemSettingModel.findOneAndUpdate(
+          { key: 'maintenanceConfig' },
+          { key: 'maintenanceConfig', value: this.maintenanceConfig },
+          { upsert: true, returnDocument: 'after' }
+        );
+      } catch (err: any) {
+        console.error(
+          '[MongoSync] Error saving maintenanceConfig setting:',
+          err.message
+        );
+      }
+    }
+    return this.maintenanceConfig;
   }
 
   public async syncUsersFromMongo(): Promise<void> {

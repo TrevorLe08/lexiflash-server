@@ -289,4 +289,143 @@ export class AdminController {
       next(error);
     }
   }
+
+  static async getBannerNotification(
+    _req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const banner = await AdminService.getBannerNotification();
+      return ApiResponse.success(
+        res,
+        { banner },
+        'Banner notification retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateBannerNotification(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const banner = await AdminService.updateBannerNotification(req.body);
+      return ApiResponse.success(
+        res,
+        { banner },
+        'Banner notification updated successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getFolders(req: Request, res: Response, next: NextFunction) {
+    try {
+      const page = req.query['page'] ? Number(req.query['page']) : 1;
+      const limit = req.query['limit'] ? Number(req.query['limit']) : 10;
+      const search = (req.query['search'] as string) || '';
+      const isFeatured =
+        req.query['isFeatured'] === 'true'
+          ? true
+          : req.query['isFeatured'] === 'false'
+            ? false
+            : undefined;
+
+      const result = await AdminService.getAllFolders({
+        page,
+        limit,
+        search,
+        isFeatured,
+      });
+
+      return ApiResponse.success(
+        res,
+        result,
+        'Admin folders retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async toggleFeaturedFolder(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const folderId = getParam(req.params['id']);
+      const { isFeatured } = req.body;
+
+      const updated = await AdminService.toggleFeaturedFolder(
+        folderId,
+        Boolean(isFeatured)
+      );
+
+      return ApiResponse.success(
+        res,
+        updated,
+        `Folder ${isFeatured ? 'featured' : 'unfeatured'} successfully`
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteFolder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const folderId = getParam(req.params['id']);
+      await AdminService.deleteFolder(folderId);
+      return ApiResponse.success(res, null, 'Folder deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getMaintenance(
+    _req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const maintenance = await AdminService.getMaintenanceConfig();
+      return ApiResponse.success(
+        res,
+        { maintenance },
+        'Maintenance configuration retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateMaintenance(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { isActive, title, message, estimatedEndTime } = req.body;
+      const updated = await AdminService.updateMaintenanceConfig({
+        isActive,
+        title,
+        message,
+        estimatedEndTime,
+      });
+
+      return ApiResponse.success(
+        res,
+        { maintenance: updated },
+        'Maintenance configuration updated successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

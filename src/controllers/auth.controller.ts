@@ -22,6 +22,15 @@ export class AuthController {
     }
   }
 
+  static async adminLogin(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await AuthService.adminLogin(req.body);
+      return ApiResponse.success(res, result, 'Admin logged in successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async refreshToken(req: Request, res: Response, next: NextFunction) {
     try {
       const { refreshToken } = req.body;

@@ -27,4 +27,5 @@ export interface ExploreRecommendationResult {
   featuredSets: StudySetWithDetails[];
   recentSets: StudySetWithDetails[];
   popularTags: string[];
+  featuredFolders: FolderWithDetails[];
 }

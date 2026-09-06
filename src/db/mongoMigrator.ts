@@ -4,6 +4,12 @@ import { CardModel } from '../models/Card.model.js';
 import { FolderModel } from '../models/Folder.model.js';
 import { ClassModel } from '../models/Class.model.js';
 import { UserCardProgressModel } from '../models/UserCardProgress.model.js';
+import { SystemSettingModel } from '../models/SystemSetting.model.js';
+import {
+  DEFAULT_BANNER_NOTIFICATION,
+  DEFAULT_MAINTENANCE_CONFIG,
+} from '../types/system.types.js';
+import { DEFAULT_FEATURED_TOPICS } from './mockDb.js';
 
 /**
  * Auto-migration routine for MongoDB Production / Existing Databases.
@@ -53,6 +59,10 @@ export async function autoMigrateDatabase(): Promise<{
     await UserModel.updateMany(
       { isBanned: { $exists: false } },
       { $set: { isBanned: false } }
+    );
+    await UserModel.updateMany(
+      { resetPasswordToken: { $exists: false } },
+      { $set: { resetPasswordToken: null, resetPasswordExpires: null } }
     );
 
     // 2. Cards: Phonetic, Example, Hint, OrderIndex
@@ -112,6 +122,10 @@ export async function autoMigrateDatabase(): Promise<{
       { studySetIds: { $exists: false } },
       { $set: { studySetIds: [] } }
     );
+    await FolderModel.updateMany(
+      { isFeatured: { $exists: false } },
+      { $set: { isFeatured: false } }
+    );
 
     // 5. Classes: Description, Settings, Members, StudySets, JoinCode
     await ClassModel.updateMany(
@@ -157,6 +171,37 @@ export async function autoMigrateDatabase(): Promise<{
         },
       }
     );
+
+    // 7. SystemSettings: Ensure maintenanceConfig, bannerNotification, featuredTopics exist
+    const maintenanceSetting = await SystemSettingModel.findOne({
+      key: 'maintenanceConfig',
+    });
+    if (!maintenanceSetting) {
+      await SystemSettingModel.create({
+        key: 'maintenanceConfig',
+        value: DEFAULT_MAINTENANCE_CONFIG,
+      });
+    }
+
+    const bannerSetting = await SystemSettingModel.findOne({
+      key: 'bannerNotification',
+    });
+    if (!bannerSetting) {
+      await SystemSettingModel.create({
+        key: 'bannerNotification',
+        value: DEFAULT_BANNER_NOTIFICATION,
+      });
+    }
+
+    const featuredSetting = await SystemSettingModel.findOne({
+      key: 'featuredTopics',
+    });
+    if (!featuredSetting) {
+      await SystemSettingModel.create({
+        key: 'featuredTopics',
+        value: DEFAULT_FEATURED_TOPICS,
+      });
+    }
 
     console.log(
       '✅ [DB Migration] All database collections are fully synced and compatible with Backend v2!'
