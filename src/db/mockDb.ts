@@ -78,7 +78,10 @@ export class SyncedMap<T extends { id: string }> extends Map<string, T> {
         .updateOne({ id: key }, { $set: plain }, { upsert: true })
         .catch((err: any) => {
           if (isMongoConnected()) {
-            console.error(`[MongoSync] Error upserting to ${this.model.modelName}:`, err.message);
+            console.error(
+              `[MongoSync] Error upserting to ${this.model.modelName}:`,
+              err.message
+            );
           }
         });
     }
@@ -90,7 +93,10 @@ export class SyncedMap<T extends { id: string }> extends Map<string, T> {
     if (this.model && isMongoConnected()) {
       this.model.deleteOne({ id: key }).catch((err: any) => {
         if (isMongoConnected()) {
-          console.error(`[MongoSync] Error deleting from ${this.model.modelName}:`, err.message);
+          console.error(
+            `[MongoSync] Error deleting from ${this.model.modelName}:`,
+            err.message
+          );
         }
       });
     }
@@ -101,26 +107,27 @@ export class SyncedMap<T extends { id: string }> extends Map<string, T> {
 class MockDatabase {
   public users: SyncedMap<User> = new SyncedMap<User>(UserModel);
   public refreshTokens: Map<string, RefreshToken> = new Map();
-  public studySets: SyncedMap<StudySet> = new SyncedMap<StudySet>(StudySetModel);
+  public studySets: SyncedMap<StudySet> = new SyncedMap<StudySet>(
+    StudySetModel
+  );
   public cards: SyncedMap<Card> = new SyncedMap<Card>(CardModel);
   public folders: SyncedMap<Folder> = new SyncedMap<Folder>(FolderModel);
   public classes: SyncedMap<ClassGroup> = new SyncedMap<ClassGroup>(ClassModel);
-  public userCardProgress: SyncedMap<UserCardProgress> = new SyncedMap<UserCardProgress>(
-    UserCardProgressModel
-  );
+  public userCardProgress: SyncedMap<UserCardProgress> =
+    new SyncedMap<UserCardProgress>(UserCardProgressModel);
   public studySessions: SyncedMap<StudySession> = new SyncedMap<StudySession>(
     StudySessionModel
   );
-  public studyRoomSessions: SyncedMap<StudyRoomSession> = new SyncedMap<StudyRoomSession>(
-    StudyRoomSessionModel
+  public studyRoomSessions: SyncedMap<StudyRoomSession> =
+    new SyncedMap<StudyRoomSession>(StudyRoomSessionModel);
+  public dailyQuests: SyncedMap<DailyQuest> = new SyncedMap<DailyQuest>(
+    DailyQuestModel
   );
-  public dailyQuests: SyncedMap<DailyQuest> = new SyncedMap<DailyQuest>(DailyQuestModel);
   public testHistories: SyncedMap<TestHistory> = new SyncedMap<TestHistory>(
     TestHistoryModel
   );
-  public matchLeaderboards: SyncedMap<MatchLeaderboardEntry> = new SyncedMap<MatchLeaderboardEntry>(
-    MatchLeaderboardModel
-  );
+  public matchLeaderboards: SyncedMap<MatchLeaderboardEntry> =
+    new SyncedMap<MatchLeaderboardEntry>(MatchLeaderboardModel);
   public featuredTopics: string[] = [...DEFAULT_FEATURED_TOPICS];
 
   constructor() {
@@ -376,7 +383,10 @@ class MockDatabase {
         this.matchLeaderboards.rawSet((l as any).id, l as any);
       }
     } catch (err: any) {
-      console.error('❌ [MongoDB] Error hydrating cache from MongoDB Atlas:', err.message);
+      console.error(
+        '❌ [MongoDB] Error hydrating cache from MongoDB Atlas:',
+        err.message
+      );
     }
   }
 
@@ -390,7 +400,10 @@ class MockDatabase {
           { upsert: true, new: true }
         );
       } catch (err: any) {
-        console.error('[MongoSync] Error saving featuredTopics setting:', err.message);
+        console.error(
+          '[MongoSync] Error saving featuredTopics setting:',
+          err.message
+        );
       }
     }
     return this.featuredTopics;
@@ -430,7 +443,10 @@ class MockDatabase {
         this.users.rawSet(userObj.id, userObj);
       }
     } catch (err: any) {
-      console.warn('[MongoSync] Error syncing users from MongoDB:', err.message);
+      console.warn(
+        '[MongoSync] Error syncing users from MongoDB:',
+        err.message
+      );
     }
   }
 

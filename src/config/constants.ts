@@ -22,6 +22,7 @@ export enum StudyMode {
   WRITE = 'WRITE',
   TEST = 'TEST',
   MATCH = 'MATCH',
+  CLOZE = 'CLOZE',
 }
 
 export enum QuestionType {

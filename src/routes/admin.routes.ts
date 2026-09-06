@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/admin.controller.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
+import { validate } from '../middlewares/validate.middleware.js';
+import { updateUserRoleSchema } from '../validations/user.schema.js';
 import { UserRole } from '../config/constants.js';
 
 const router = Router();
@@ -13,7 +15,11 @@ router.get('/stats', AdminController.getOverviewStats);
 
 // User Management
 router.get('/users', AdminController.getAllUsers);
-router.patch('/users/:id/role', AdminController.updateUserRole);
+router.patch(
+  '/users/:id/role',
+  validate(updateUserRoleSchema),
+  AdminController.updateUserRole
+);
 router.patch('/users/:id/ban', AdminController.toggleUserBan);
 router.post('/users/:id/vip', AdminController.updateUserVip);
 

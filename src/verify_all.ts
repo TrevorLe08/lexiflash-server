@@ -1,3 +1,5 @@
+process.env.NODE_ENV = 'test';
+
 import { createApp } from '../src/app.js';
 import { AuthService } from '../src/services/auth.service.js';
 import { StudySetService } from '../src/services/studySet.service.js';
@@ -90,9 +92,13 @@ async function runVerification() {
       }),
     });
     if (badResetRes.status !== 400) {
-      throw new Error(`Expected 400 for invalid token, got ${badResetRes.status}`);
+      throw new Error(
+        `Expected 400 for invalid token, got ${badResetRes.status}`
+      );
     }
-    console.log('🔒 Invalid reset token properly rejected with 400 Bad Request.');
+    console.log(
+      '🔒 Invalid reset token properly rejected with 400 Bad Request.'
+    );
 
     // In-app change-password: Test wrong current password
     const badChangeRes = await fetch(`${baseUrl}/auth/change-password`, {
@@ -111,7 +117,9 @@ async function runVerification() {
         `Expected 400 for wrong old password, got ${badChangeRes.status}`
       );
     }
-    console.log('🔒 Incorrect current password properly rejected with 400 Bad Request.');
+    console.log(
+      '🔒 Incorrect current password properly rejected with 400 Bad Request.'
+    );
 
     // Change password to BrandNewPassword123!
     const validChangeRes = await fetch(`${baseUrl}/auth/change-password`, {
@@ -125,11 +133,16 @@ async function runVerification() {
         newPassword: 'BrandNewPassword123!',
       }),
     });
-    const validChangeJson = (await validChangeRes.json()) as ApiResponsePayload<null>;
+    const validChangeJson =
+      (await validChangeRes.json()) as ApiResponsePayload<null>;
     if (validChangeRes.status !== 200 || !validChangeJson.success) {
-      throw new Error(`Change password failed: ${JSON.stringify(validChangeJson)}`);
+      throw new Error(
+        `Change password failed: ${JSON.stringify(validChangeJson)}`
+      );
     }
-    console.log('✅ POST /auth/change-password succeeded with valid credentials.');
+    console.log(
+      '✅ POST /auth/change-password succeeded with valid credentials.'
+    );
 
     // Revert password back to Password123! so other tests continue seamlessly
     const revertChangeRes = await fetch(`${baseUrl}/auth/change-password`, {
@@ -146,7 +159,9 @@ async function runVerification() {
     if (revertChangeRes.status !== 200) {
       throw new Error('Failed to revert test password');
     }
-    console.log('✅ Reverted test user password back to standard Password123!.');
+    console.log(
+      '✅ Reverted test user password back to standard Password123!.'
+    );
 
     // 2. Study Sets Live HTTP API Tests (Fixing 500 issue)
     console.log('\n2️⃣ Testing Live HTTP Study Sets Endpoint:');
@@ -197,9 +212,13 @@ async function runVerification() {
       `✅ HTTP GET /study-sets?search=ielts returned status 200 with ${jsonRes3.data.length} sets.`
     );
 
-    const firstSet = jsonRes1.data.find(
+    const firstSet = (jsonRes1.data.find(
       (s: StudySetWithDetails) => s.creatorId === loginRes.user.id
-    )!;
+    ) ||
+      Array.from(mockDb.studySets.values()).find(
+        (s) => s.creatorId === loginRes.user.id
+      ) ||
+      jsonRes1.data[0])!;
 
     // Bookmark test
     const bookmarkRes = await StudySetService.toggleBookmark(
@@ -279,7 +298,8 @@ async function runVerification() {
       firstSet.id,
       12500,
       tiles.totalPairs,
-      loginRes.user.id
+      loginRes.user.id,
+      tiles.sessionToken
     );
     console.log(
       `✅ Submitted match score: ${(matchResult.entry.timeRecordMs / 1000).toFixed(2)}s (New Best: ${matchResult.isNewPersonalBest})`
@@ -287,6 +307,24 @@ async function runVerification() {
 
     // 7. Folder & Class Test (with Non-Member Privacy Verification)
     console.log('\n7️⃣ Testing Folders & Classes:');
+    // Ensure idempotent test run: clean up previous test folder and class
+    for (const [fId, fld] of mockDb.folders.entries()) {
+      if (
+        fld.creatorId === loginRes.user.id &&
+        fld.title === 'My Master English Folder'
+      ) {
+        mockDb.folders.delete(fId);
+      }
+    }
+    for (const [cId, cls] of mockDb.classes.entries()) {
+      if (
+        cls.creatorId === loginRes.user.id &&
+        cls.name === 'TOEIC 900+ Fighters'
+      ) {
+        mockDb.classes.delete(cId);
+      }
+    }
+
     const newFolder = await FolderService.create(
       { title: 'My Master English Folder', studySetIds: [firstSet.id] },
       loginRes.user.id

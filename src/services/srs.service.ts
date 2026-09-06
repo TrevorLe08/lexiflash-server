@@ -368,8 +368,18 @@ export class SrsService {
       cardsCorrect: number;
       cardsIncorrect: number;
       timeSpentSeconds: number;
+      correctCardIds?: string[];
+      incorrectCardIds?: string[];
     }
-  ): Promise<StudySession & { streak?: StreakInfo }> {
+  ): Promise<
+    StudySession & {
+      streak?: StreakInfo;
+      streakIncreased?: boolean;
+      streakMaintained?: boolean;
+      mistakesUpdated?: { added: number; resolved: number };
+    }
+  > {
+    const now = new Date().toISOString();
     const session: StudySession = {
       id: generateId('ses'),
       userId,
@@ -379,16 +389,80 @@ export class SrsService {
       cardsCorrect: input.cardsCorrect,
       cardsIncorrect: input.cardsIncorrect,
       timeSpentSeconds: input.timeSpentSeconds,
-      completedAt: new Date().toISOString(),
+      completedAt: now,
     };
 
     mockDb.studySessions.set(session.id, session);
+
+    // Update Mistake Bank (lapses) if card IDs provided
+    let added = 0;
+    let resolved = 0;
+
+    if (input.incorrectCardIds && input.incorrectCardIds.length > 0) {
+      for (const cardId of input.incorrectCardIds) {
+        let progressRecord: UserCardProgress | undefined;
+        for (const p of mockDb.userCardProgress.values()) {
+          if (p.userId === userId && p.cardId === cardId) {
+            progressRecord = p;
+            break;
+          }
+        }
+
+        if (!progressRecord) {
+          progressRecord = {
+            id: generateId('prog'),
+            userId,
+            cardId,
+            studySetId: input.studySetId,
+            status: CardStudyStatus.LEARNING,
+            repetitionNumber: 0,
+            easeFactor: 2.5,
+            intervalDays: 0,
+            nextReviewDate: now,
+            lapses: 1,
+            isStarred: false,
+            lastStudiedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          };
+        } else {
+          progressRecord.lapses = (progressRecord.lapses || 0) + 1;
+          if (progressRecord.status === CardStudyStatus.NOT_STUDIED) {
+            progressRecord.status = CardStudyStatus.LEARNING;
+          }
+          progressRecord.lastStudiedAt = now;
+          progressRecord.updatedAt = now;
+        }
+        mockDb.userCardProgress.set(progressRecord.id, progressRecord);
+        added++;
+      }
+    }
+
+    if (input.correctCardIds && input.correctCardIds.length > 0) {
+      for (const cardId of input.correctCardIds) {
+        for (const p of mockDb.userCardProgress.values()) {
+          if (p.userId === userId && p.cardId === cardId) {
+            if (p.lapses > 0) {
+              p.lapses = Math.max(0, p.lapses - 1);
+              p.lastStudiedAt = now;
+              p.updatedAt = now;
+              mockDb.userCardProgress.set(p.id, p);
+              resolved++;
+            }
+            break;
+          }
+        }
+      }
+    }
 
     const streakResult = await StreakService.recordStudyActivity(userId);
 
     return {
       ...session,
       streak: streakResult.streakInfo,
+      streakIncreased: streakResult.streakIncreased,
+      streakMaintained: streakResult.streakMaintained,
+      mistakesUpdated: { added, resolved },
     };
   }
 }

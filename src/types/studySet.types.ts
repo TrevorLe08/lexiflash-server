@@ -37,6 +37,7 @@ export interface StudySetWithDetails extends StudySet {
   isBookmarked?: boolean;
   bookmarkCount?: number;
   isFeatured?: boolean;
+  hasPassword?: boolean;
 }
 
 export interface CreateStudySetInput {

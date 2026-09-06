@@ -3,6 +3,7 @@ import { verifyAccessToken } from '../utils/token.js';
 import { ApiError } from '../utils/apiError.js';
 import { UserRole } from '../config/constants.js';
 import { mockDb } from '../db/mockDb.js';
+import { isUserVip } from '../utils/user.utils.js';
 
 export const authenticate = (
   req: Request,
@@ -107,16 +108,7 @@ export const requireVip = (
     return next(ApiError.unauthorized('User not found'));
   }
 
-  // Admins always have VIP privileges
-  if (user.role === UserRole.ADMIN) {
-    return next();
-  }
-
-  // Check VIP expiration
-  const isVipActive =
-    user.vipExpiresAt && new Date(user.vipExpiresAt).getTime() > Date.now();
-
-  if (!isVipActive && !user.isVip) {
+  if (!isUserVip(user)) {
     return next(
       ApiError.forbidden(
         'Tính năng AI chỉ dành riêng cho thành viên VIP hoặc Admin. Vui lòng nâng cấp VIP!'

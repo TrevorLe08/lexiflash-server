@@ -21,10 +21,17 @@ export type QuestType =
   | 'FOCUS_45M_TARGET' // Auto: Achieve 45 minutes of total daily focus
   | 'UNBROKEN_POMODORO_25M' // Auto: Complete 1 unbroken 25m Pomodoro session
   | 'PERFECT_TEST_EXAM' // Auto: Complete a test exam with 100% perfect score
+  | 'HIGH_SCORE_TEST' // Auto: Complete test exam with >= 80% score
   | 'FLAWLESS_SM2_LEARN' // Auto: Complete Learn session without selecting hard/forgot
   | 'CREATE_STUDY_SET' // Auto: Create 1 new study set
   | 'COMPLETE_STUDY_MODE' // Auto: Complete 1 full study session in any mode
   | 'TAKE_PRACTICE_QUIZ' // Auto: Complete 1 quiz
+  | 'STUDY_CLOZE_MODE' // Auto: Complete 1 Cloze test session
+  | 'STUDY_WRITE_MODE' // Auto: Complete 1 Write/Dictation session
+  | 'PLAY_MATCH_GAME' // Auto: Play 1 Match game session
+  | 'REVIEW_STARRED_CARDS' // Auto: Review starred cards
+  | 'STUDY_FLASHCARDS' // Auto: Review flashcards
+  | 'AI_GENERATE_CARDS' // Auto: Generate cards with AI
   | 'CUSTOM_USER_TASK'; // Manual: User-added task
 
 export interface DailyQuest {

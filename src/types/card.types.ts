@@ -9,6 +9,7 @@ export interface Card {
   imageUrl?: string;
   audioUrl?: string;
   orderIndex: number;
+  isStarred?: boolean;
   createdAt: string;
   updatedAt: string;
 }

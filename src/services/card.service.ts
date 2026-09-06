@@ -2,7 +2,7 @@ import { mockDb } from '../db/mockDb.js';
 import { Card, CreateCardInput, UpdateCardInput } from '../types/card.types.js';
 import { generateId } from '../utils/id.js';
 import { ApiError } from '../utils/apiError.js';
-import { CardStudyStatus } from '../config/constants.js';
+import { CardStudyStatus, PrivacyLevel } from '../config/constants.js';
 import { UserCardProgress } from '../types/study.types.js';
 import {
   isUserVip,
@@ -11,16 +11,46 @@ import {
 } from '../utils/user.utils.js';
 
 export class CardService {
-  static async getCardsBySetId(studySetId: string): Promise<Card[]> {
+  static async getCardsBySetId(
+    studySetId: string,
+    userId?: string,
+    password?: string
+  ): Promise<Card[]> {
     const set = mockDb.studySets.get(studySetId);
     if (!set) {
       throw ApiError.notFound('Study set not found');
     }
 
+    const isOwner = userId && set.creatorId === userId;
+    if (!isOwner) {
+      if (set.privacy === PrivacyLevel.PRIVATE) {
+        throw ApiError.forbidden('This study set is private');
+      }
+      if (set.privacy === PrivacyLevel.PASSWORD) {
+        if (!password || password !== set.password) {
+          throw ApiError.forbidden(
+            'Invalid password for this protected study set'
+          );
+        }
+      }
+    }
+
+    const userStarredCardIds = new Set<string>();
+    if (userId) {
+      for (const p of mockDb.userCardProgress.values()) {
+        if (p.userId === userId && p.isStarred) {
+          userStarredCardIds.add(p.cardId);
+        }
+      }
+    }
+
     const cards: Card[] = [];
     for (const c of mockDb.cards.values()) {
       if (c.studySetId === studySetId) {
-        cards.push({ ...c });
+        cards.push({
+          ...c,
+          isStarred: userStarredCardIds.has(c.id),
+        });
       }
     }
     cards.sort((a, b) => a.orderIndex - b.orderIndex);

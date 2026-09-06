@@ -20,10 +20,11 @@ export class MailService {
             pass: ENV.GMAIL_APP_PASSWORD,
           },
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         console.error(
           '❌ [MailService] Failed to initialize nodemailer transporter:',
-          err.message
+          msg
         );
       }
     }
@@ -50,7 +51,9 @@ export class MailService {
     const { to, userName, resetUrl } = params;
     const fromName = ENV.EMAIL_FROM_NAME || 'LexiFlash Support';
 
-    console.log(`📧 [MailService] Preparing to send password reset email to ${to}...`);
+    console.log(
+      `📧 [MailService] Preparing to send password reset email to ${to}...`
+    );
     console.log(`🔗 [MailService] Password Reset URL: ${resetUrl}`);
 
     const transporter = this.getTransporter();
@@ -165,10 +168,13 @@ export class MailService {
         attachments,
       });
 
-      console.log(`✅ [MailService] Password reset email sent successfully to ${to}`);
+      console.log(
+        `✅ [MailService] Password reset email sent successfully to ${to}`
+      );
       return true;
-    } catch (error: any) {
-      console.error(`❌ [MailService] Error sending email to ${to}:`, error.message);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`❌ [MailService] Error sending email to ${to}:`, msg);
       return false;
     }
   }

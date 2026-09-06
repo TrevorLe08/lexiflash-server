@@ -15,11 +15,11 @@ function toDateString(d: unknown): string {
   if (!d) return '';
   if (typeof d === 'string') return d;
   if (d instanceof Date) return d.toISOString();
-  try {
-    return new Date(d as any).toISOString();
-  } catch {
-    return '';
+  if (typeof d === 'number') {
+    const date = new Date(d);
+    return isNaN(date.getTime()) ? '' : date.toISOString();
   }
+  return '';
 }
 
 export class StudyRoomService {
@@ -72,7 +72,8 @@ export class StudyRoomService {
 
     const tookTestToday =
       Array.from(mockDb.testHistories.values()).some(
-        (th) => th.userId === userId && toDateString(th.createdAt).startsWith(today)
+        (th) =>
+          th.userId === userId && toDateString(th.createdAt).startsWith(today)
       ) ||
       Array.from(mockDb.studySessions.values()).some(
         (ss) =>
@@ -85,7 +86,19 @@ export class StudyRoomService {
       (th) =>
         th.userId === userId &&
         toDateString(th.createdAt).startsWith(today) &&
-        (th.scorePercentage === 100 || (th.incorrectCount === 0 && th.correctCount > 0))
+        (th.scorePercentage === 100 ||
+          (th.incorrectCount === 0 && th.correctCount > 0))
+    );
+
+    const highScoreTestToday = Array.from(mockDb.testHistories.values()).some(
+      (th) =>
+        th.userId === userId &&
+        toDateString(th.createdAt).startsWith(today) &&
+        (th.scorePercentage >= 80 ||
+          (th.correctCount > 0 &&
+            th.correctCount /
+              Math.max(1, th.correctCount + th.incorrectCount) >=
+              0.8))
     );
 
     const flawlessLearnToday = Array.from(mockDb.studySessions.values()).some(
@@ -97,16 +110,65 @@ export class StudyRoomService {
         ss.cardsIncorrect === 0
     );
 
+    const tookClozeToday = Array.from(mockDb.studySessions.values()).some(
+      (ss) =>
+        ss.userId === userId &&
+        toDateString(ss.completedAt).startsWith(today) &&
+        ss.mode === 'CLOZE'
+    );
+
+    const tookWriteToday = Array.from(mockDb.studySessions.values()).some(
+      (ss) =>
+        ss.userId === userId &&
+        toDateString(ss.completedAt).startsWith(today) &&
+        ss.mode === 'WRITE'
+    );
+
+    const playedMatchToday =
+      Array.from(mockDb.studySessions.values()).some(
+        (ss) =>
+          ss.userId === userId &&
+          toDateString(ss.completedAt).startsWith(today) &&
+          ss.mode === 'MATCH'
+      ) ||
+      Array.from(mockDb.matchLeaderboards.values()).some(
+        (e) =>
+          e.userId === userId && toDateString(e.createdAt).startsWith(today)
+      );
+
+    const tookFlashcardsToday = Array.from(mockDb.studySessions.values()).some(
+      (ss) =>
+        ss.userId === userId &&
+        toDateString(ss.completedAt).startsWith(today) &&
+        ss.mode === 'FLASHCARDS'
+    );
+
+    const reviewedStarredToday = Array.from(
+      mockDb.userCardProgress.values()
+    ).some(
+      (p) =>
+        p.userId === userId &&
+        p.isStarred &&
+        !!p.lastStudiedAt &&
+        toDateString(p.lastStudiedAt).startsWith(today)
+    );
+
+    const usedAiToday =
+      user.aiUsageResetDate === today && (user.aiUsageToday || 0) > 0;
+
     const createdSetsTodayCount = Array.from(mockDb.studySets.values()).filter(
-      (s) => s.creatorId === userId && toDateString(s.createdAt).startsWith(today)
+      (s) =>
+        s.creatorId === userId && toDateString(s.createdAt).startsWith(today)
     ).length;
 
     const completedStudyModeToday =
       Array.from(mockDb.studySessions.values()).some(
-        (ss) => ss.userId === userId && toDateString(ss.completedAt).startsWith(today)
+        (ss) =>
+          ss.userId === userId && toDateString(ss.completedAt).startsWith(today)
       ) ||
       Array.from(mockDb.testHistories.values()).some(
-        (th) => th.userId === userId && toDateString(th.createdAt).startsWith(today)
+        (th) =>
+          th.userId === userId && toDateString(th.createdAt).startsWith(today)
       );
 
     const unbrokenPomodoroToday = Array.from(
@@ -123,7 +185,9 @@ export class StudyRoomService {
       completedStudyModeToday ||
       Array.from(mockDb.studyRoomSessions.values()).some(
         (s) =>
-          s.userId === userId && !!s.deckId && toDateString(s.startedAt).startsWith(today)
+          s.userId === userId &&
+          !!s.deckId &&
+          toDateString(s.startedAt).startsWith(today)
       ) ||
       Array.from(mockDb.userCardProgress.values()).some(
         (p) =>
@@ -137,21 +201,28 @@ export class StudyRoomService {
         (s) => s.creatorId !== userId && s.bookmarkedUserIds?.includes(userId)
       ) || createdSetsTodayCount > 0;
 
+    const questFlags = {
+      currentFocusedMinutes: focusedMinutes,
+      dueCount,
+      studiedAnySetToday,
+      tookTestToday,
+      perfectTestToday,
+      highScoreTestToday,
+      flawlessLearnToday,
+      tookClozeToday,
+      tookWriteToday,
+      playedMatchToday,
+      tookFlashcardsToday,
+      reviewedStarredToday,
+      usedAiToday,
+      createdSetsTodayCount,
+      completedStudyModeToday,
+      unbrokenPomodoroToday,
+      exploredSetToday,
+    };
+
     if (todayQuests.length === 0) {
-      todayQuests = await this.generateDailyQuests(
-        userId,
-        today,
-        focusedMinutes,
-        dueCount,
-        studiedAnySetToday,
-        tookTestToday,
-        perfectTestToday,
-        flawlessLearnToday,
-        createdSetsTodayCount,
-        completedStudyModeToday,
-        unbrokenPomodoroToday,
-        exploredSetToday
-      );
+      todayQuests = await this.generateDailyQuests(userId, today, questFlags);
     } else {
       // Sync dynamic stats into existing auto-quests strictly from real activity
       for (const q of todayQuests) {
@@ -183,6 +254,9 @@ export class StudyRoomService {
         } else if (q.type === 'PERFECT_TEST_EXAM') {
           q.currentCount = perfectTestToday ? 1 : 0;
           q.isCompleted = perfectTestToday;
+        } else if (q.type === 'HIGH_SCORE_TEST') {
+          q.currentCount = highScoreTestToday ? 1 : 0;
+          q.isCompleted = highScoreTestToday;
         } else if (q.type === 'FLAWLESS_SM2_LEARN') {
           q.currentCount = flawlessLearnToday ? 1 : 0;
           q.isCompleted = flawlessLearnToday;
@@ -195,6 +269,24 @@ export class StudyRoomService {
         } else if (q.type === 'TAKE_PRACTICE_QUIZ') {
           q.currentCount = tookTestToday ? 1 : 0;
           q.isCompleted = tookTestToday;
+        } else if (q.type === 'STUDY_CLOZE_MODE') {
+          q.currentCount = tookClozeToday ? 1 : 0;
+          q.isCompleted = tookClozeToday;
+        } else if (q.type === 'STUDY_WRITE_MODE') {
+          q.currentCount = tookWriteToday ? 1 : 0;
+          q.isCompleted = tookWriteToday;
+        } else if (q.type === 'PLAY_MATCH_GAME') {
+          q.currentCount = playedMatchToday ? 1 : 0;
+          q.isCompleted = playedMatchToday;
+        } else if (q.type === 'REVIEW_STARRED_CARDS') {
+          q.currentCount = reviewedStarredToday ? 1 : 0;
+          q.isCompleted = reviewedStarredToday;
+        } else if (q.type === 'STUDY_FLASHCARDS') {
+          q.currentCount = tookFlashcardsToday ? 1 : 0;
+          q.isCompleted = tookFlashcardsToday;
+        } else if (q.type === 'AI_GENERATE_CARDS') {
+          q.currentCount = usedAiToday ? 1 : 0;
+          q.isCompleted = usedAiToday;
         }
       }
     }
@@ -221,7 +313,9 @@ export class StudyRoomService {
         // Auto-generated quests first, then custom tasks
         if (a.isAutoGenerated && !b.isAutoGenerated) return -1;
         if (!a.isAutoGenerated && b.isAutoGenerated) return 1;
-        return toDateString(a.createdAt).localeCompare(toDateString(b.createdAt));
+        return toDateString(a.createdAt).localeCompare(
+          toDateString(b.createdAt)
+        );
       }),
       srsForecast,
     };
@@ -233,38 +327,53 @@ export class StudyRoomService {
   private static async generateDailyQuests(
     userId: string,
     date: string,
-    currentFocusedMinutes: number,
-    dueCount: number,
-    studiedAnySetToday: boolean,
-    tookTestToday: boolean,
-    perfectTestToday: boolean,
-    flawlessLearnToday: boolean,
-    createdSetsTodayCount: number,
-    completedStudyModeToday: boolean,
-    unbrokenPomodoroToday: boolean,
-    exploredSetToday: boolean
+    flags: {
+      currentFocusedMinutes: number;
+      dueCount: number;
+      studiedAnySetToday: boolean;
+      tookTestToday: boolean;
+      perfectTestToday: boolean;
+      highScoreTestToday: boolean;
+      flawlessLearnToday: boolean;
+      tookClozeToday: boolean;
+      tookWriteToday: boolean;
+      playedMatchToday: boolean;
+      tookFlashcardsToday: boolean;
+      reviewedStarredToday: boolean;
+      usedAiToday: boolean;
+      createdSetsTodayCount: number;
+      completedStudyModeToday: boolean;
+      unbrokenPomodoroToday: boolean;
+      exploredSetToday: boolean;
+    }
   ): Promise<DailyQuest[]> {
     const generated: DailyQuest[] = [];
     const now = new Date().toISOString();
 
+    const userSessions = Array.from(mockDb.studySessions.values())
+      .filter((s) => s.userId === userId && !!s.studySetId)
+      .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+    const recentSessionSetId = userSessions[0]?.studySetId;
+
     const userSets = Array.from(mockDb.studySets.values()).filter(
       (s) => s.creatorId === userId
     );
-    const targetSet = userSets[0];
-    const targetSetId = targetSet ? targetSet.id : '';
+    const targetSetId = recentSessionSetId || userSets[0]?.id || '';
 
     // Day hash to give consistent daily variety
-    const daySeed = date.split('-').reduce((acc, part) => acc + parseInt(part, 10), 0);
+    const daySeed = date
+      .split('-')
+      .reduce((acc, part) => acc + parseInt(part, 10), 0);
 
-    // 1. Slot 1: Due SRS Review Cards Quest (or fallback to explore if 0 cards due today)
-    if (dueCount > 0) {
+    // 1. Slot 1: Due SRS Review Cards Quest (or fallback when 0 cards due)
+    if (flags.dueCount > 0) {
       generated.push({
         id: `quest_due_${generateId()}`,
         userId,
         date,
         type: 'REVIEW_DUE_CARDS',
-        title: `Ôn tập ${dueCount} từ đến hạn (SRS Reviews)`,
-        targetCount: dueCount,
+        title: `Ôn tập ${flags.dueCount} từ đến hạn (SRS Reviews)`,
+        targetCount: flags.dueCount,
         currentCount: 0,
         isCompleted: false,
         actionUrl: '/reviews',
@@ -273,20 +382,57 @@ export class StudyRoomService {
         updatedAt: now,
       });
     } else {
-      generated.push({
-        id: `quest_explore_${generateId()}`,
-        userId,
-        date,
-        type: 'EXPLORE_COMMUNITY_SET',
-        title: 'Khám phá và lưu 1 học phần mới từ cộng đồng',
-        targetCount: 1,
-        currentCount: exploredSetToday ? 1 : 0,
-        isCompleted: exploredSetToday,
-        actionUrl: '/',
-        isAutoGenerated: true,
-        createdAt: now,
-        updatedAt: now,
-      });
+      const fallbackVariant = daySeed % 3;
+      if (fallbackVariant === 0) {
+        generated.push({
+          id: `quest_starred_${generateId()}`,
+          userId,
+          date,
+          type: 'REVIEW_STARRED_CARDS',
+          title: 'Ôn tập lại các thẻ từ vựng đã gắn sao (⭐)',
+          targetCount: 1,
+          currentCount: flags.reviewedStarredToday ? 1 : 0,
+          isCompleted: flags.reviewedStarredToday,
+          actionUrl: targetSetId
+            ? `/sets/${targetSetId}/flashcards?starred=true`
+            : '/reviews',
+          isAutoGenerated: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+      } else if (fallbackVariant === 1) {
+        generated.push({
+          id: `quest_flashcards_${generateId()}`,
+          userId,
+          date,
+          type: 'STUDY_FLASHCARDS',
+          title: 'Lướt và ôn tập nhanh 1 bộ Flashcards 🗂️',
+          targetCount: 1,
+          currentCount: flags.tookFlashcardsToday ? 1 : 0,
+          isCompleted: flags.tookFlashcardsToday,
+          actionUrl: targetSetId
+            ? `/sets/${targetSetId}/flashcards`
+            : '/reviews',
+          isAutoGenerated: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+      } else {
+        generated.push({
+          id: `quest_explore_${generateId()}`,
+          userId,
+          date,
+          type: 'EXPLORE_COMMUNITY_SET',
+          title: 'Khám phá và lưu 1 học phần mới từ cộng đồng 🧭',
+          targetCount: 1,
+          currentCount: flags.exploredSetToday ? 1 : 0,
+          isCompleted: flags.exploredSetToday,
+          actionUrl: '/',
+          isAutoGenerated: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
     }
 
     // 2. Slot 2: Focus Target (Pomodoro 25m vs 45m focus vs unbroken 25m session)
@@ -297,10 +443,10 @@ export class StudyRoomService {
         userId,
         date,
         type: 'FOCUS_TIME_TARGET',
-        title: 'Tập trung học ít nhất 25 phút (Pomodoro)',
+        title: 'Tập trung học ít nhất 25 phút (Pomodoro) ⏱️',
         targetCount: 25,
-        currentCount: currentFocusedMinutes,
-        isCompleted: currentFocusedMinutes >= 25,
+        currentCount: flags.currentFocusedMinutes,
+        isCompleted: flags.currentFocusedMinutes >= 25,
         actionUrl: '/study-room',
         isAutoGenerated: true,
         createdAt: now,
@@ -312,10 +458,10 @@ export class StudyRoomService {
         userId,
         date,
         type: 'FOCUS_45M_TARGET',
-        title: 'Đạt tổng thời gian tập trung 45 phút trong ngày',
+        title: 'Đạt tổng thời gian tập trung 45 phút trong ngày ⏳',
         targetCount: 45,
-        currentCount: currentFocusedMinutes,
-        isCompleted: currentFocusedMinutes >= 45,
+        currentCount: flags.currentFocusedMinutes,
+        isCompleted: flags.currentFocusedMinutes >= 45,
         actionUrl: '/study-room',
         isAutoGenerated: true,
         createdAt: now,
@@ -327,10 +473,11 @@ export class StudyRoomService {
         userId,
         date,
         type: 'UNBROKEN_POMODORO_25M',
-        title: 'Hoàn thành trọn vẹn 1 phiên Pomodoro (25 phút) không gián đoạn',
+        title:
+          'Hoàn thành trọn vẹn 1 phiên Pomodoro (25 phút) không gián đoạn 🔥',
         targetCount: 1,
-        currentCount: unbrokenPomodoroToday ? 1 : 0,
-        isCompleted: unbrokenPomodoroToday,
+        currentCount: flags.unbrokenPomodoroToday ? 1 : 0,
+        isCompleted: flags.unbrokenPomodoroToday,
         actionUrl: '/study-room',
         isAutoGenerated: true,
         createdAt: now,
@@ -338,33 +485,63 @@ export class StudyRoomService {
       });
     }
 
-    // 3. Slot 3: Study Mode Mastery (Study any set vs Flawless Learn SM2 vs Complete study mode)
-    const studyVariant = (daySeed + 1) % 3;
+    // 3. Slot 3: Study Mode Mastery (Cloze vs Write vs Match vs Learn SM2 vs Any Set)
+    const studyVariant = (daySeed + 1) % 5;
     if (studyVariant === 0) {
       generated.push({
-        id: `quest_study_set_${generateId()}`,
+        id: `quest_cloze_${generateId()}`,
         userId,
         date,
-        type: 'STUDY_ANY_SET',
-        title: 'Học 1 học phần bất kì qua chế độ học (Flashcards, Learn...)',
+        type: 'STUDY_CLOZE_MODE',
+        title: 'Luyện 1 bài điền từ vào chỗ trống (Cloze Test) ✍️',
         targetCount: 1,
-        currentCount: studiedAnySetToday ? 1 : 0,
-        isCompleted: studiedAnySetToday,
-        actionUrl: targetSetId ? `/sets/${targetSetId}/flashcards` : '/',
+        currentCount: flags.tookClozeToday ? 1 : 0,
+        isCompleted: flags.tookClozeToday,
+        actionUrl: targetSetId ? `/sets/${targetSetId}/cloze` : '/',
         isAutoGenerated: true,
         createdAt: now,
         updatedAt: now,
       });
     } else if (studyVariant === 1) {
       generated.push({
+        id: `quest_write_${generateId()}`,
+        userId,
+        date,
+        type: 'STUDY_WRITE_MODE',
+        title: 'Luyện 1 bài nghe và viết chính tả từ vựng (Dictation) 🎧',
+        targetCount: 1,
+        currentCount: flags.tookWriteToday ? 1 : 0,
+        isCompleted: flags.tookWriteToday,
+        actionUrl: targetSetId ? `/sets/${targetSetId}/write` : '/',
+        isAutoGenerated: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else if (studyVariant === 2) {
+      generated.push({
+        id: `quest_match_${generateId()}`,
+        userId,
+        date,
+        type: 'PLAY_MATCH_GAME',
+        title: 'Chơi 1 ván trò chơi ghép thẻ từ vựng (Match Game) 🎮',
+        targetCount: 1,
+        currentCount: flags.playedMatchToday ? 1 : 0,
+        isCompleted: flags.playedMatchToday,
+        actionUrl: targetSetId ? `/sets/${targetSetId}/match` : '/',
+        isAutoGenerated: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else if (studyVariant === 3) {
+      generated.push({
         id: `quest_flawless_${generateId()}`,
         userId,
         date,
         type: 'FLAWLESS_SM2_LEARN',
-        title: 'Học 1 bộ thẻ ở chế độ Learn SM-2 mà không chọn Hard hay Forgot',
+        title: 'Học 1 bộ thẻ ở chế độ Learn SM-2 không chọn Hard hay Forgot ✨',
         targetCount: 1,
-        currentCount: flawlessLearnToday ? 1 : 0,
-        isCompleted: flawlessLearnToday,
+        currentCount: flags.flawlessLearnToday ? 1 : 0,
+        isCompleted: flags.flawlessLearnToday,
         actionUrl: targetSetId ? `/sets/${targetSetId}/learn` : '/',
         isAutoGenerated: true,
         createdAt: now,
@@ -372,33 +549,33 @@ export class StudyRoomService {
       });
     } else {
       generated.push({
-        id: `quest_complete_mode_${generateId()}`,
+        id: `quest_study_set_${generateId()}`,
         userId,
         date,
-        type: 'COMPLETE_STUDY_MODE',
-        title: 'Hoàn thành trọn vẹn 1 lượt học bất kỳ (Flashcards, Learn, Test...)',
+        type: 'STUDY_ANY_SET',
+        title: 'Học 1 học phần bất kì qua chế độ học (Flashcards, Learn...) 📖',
         targetCount: 1,
-        currentCount: completedStudyModeToday ? 1 : 0,
-        isCompleted: completedStudyModeToday,
-        actionUrl: targetSetId ? `/sets/${targetSetId}` : '/',
+        currentCount: flags.studiedAnySetToday ? 1 : 0,
+        isCompleted: flags.studiedAnySetToday,
+        actionUrl: targetSetId ? `/sets/${targetSetId}/flashcards` : '/',
         isAutoGenerated: true,
         createdAt: now,
         updatedAt: now,
       });
     }
 
-    // 4. Slot 4: Challenge / Creation (Perfect test exam vs Create new set vs Take practice quiz)
-    const challengeVariant = (daySeed + 2) % 3;
+    // 4. Slot 4: Challenge / Creation / AI (High Score Test vs Perfect Test vs AI Generator vs Create Set vs Practice Quiz)
+    const challengeVariant = (daySeed + 2) % 5;
     if (challengeVariant === 0) {
       generated.push({
-        id: `quest_perfect_test_${generateId()}`,
+        id: `quest_high_score_${generateId()}`,
         userId,
         date,
-        type: 'PERFECT_TEST_EXAM',
-        title: 'Hoàn thành một bài kiểm tra (Test Exam) đạt điểm tuyệt đối 100%',
+        type: 'HIGH_SCORE_TEST',
+        title: 'Đạt kết quả kiểm tra từ 80% trở lên ở chế độ Test 🎯',
         targetCount: 1,
-        currentCount: perfectTestToday ? 1 : 0,
-        isCompleted: perfectTestToday,
+        currentCount: flags.highScoreTestToday ? 1 : 0,
+        isCompleted: flags.highScoreTestToday,
         actionUrl: targetSetId ? `/sets/${targetSetId}/test` : '/reviews',
         isAutoGenerated: true,
         createdAt: now,
@@ -406,14 +583,44 @@ export class StudyRoomService {
       });
     } else if (challengeVariant === 1) {
       generated.push({
+        id: `quest_perfect_test_${generateId()}`,
+        userId,
+        date,
+        type: 'PERFECT_TEST_EXAM',
+        title: 'Đạt điểm tuyệt đối 100% trong một bài kiểm tra (Test Exam) 🏆',
+        targetCount: 1,
+        currentCount: flags.perfectTestToday ? 1 : 0,
+        isCompleted: flags.perfectTestToday,
+        actionUrl: targetSetId ? `/sets/${targetSetId}/test` : '/reviews',
+        isAutoGenerated: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else if (challengeVariant === 2) {
+      generated.push({
+        id: `quest_ai_${generateId()}`,
+        userId,
+        date,
+        type: 'AI_GENERATE_CARDS',
+        title: 'Trải nghiệm tạo thẻ từ vựng thông minh bằng Trợ lý AI 🤖',
+        targetCount: 1,
+        currentCount: flags.usedAiToday ? 1 : 0,
+        isCompleted: flags.usedAiToday,
+        actionUrl: '/ai-generator',
+        isAutoGenerated: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else if (challengeVariant === 3) {
+      generated.push({
         id: `quest_create_set_${generateId()}`,
         userId,
         date,
         type: 'CREATE_STUDY_SET',
-        title: 'Tạo thêm 1 học phần mới (bằng AI hoặc thủ công)',
+        title: 'Tạo thêm 1 học phần mới (bằng AI hoặc thủ công) ➕',
         targetCount: 1,
-        currentCount: createdSetsTodayCount,
-        isCompleted: createdSetsTodayCount >= 1,
+        currentCount: flags.createdSetsTodayCount,
+        isCompleted: flags.createdSetsTodayCount >= 1,
         actionUrl: '/sets/create',
         isAutoGenerated: true,
         createdAt: now,
@@ -425,10 +632,10 @@ export class StudyRoomService {
         userId,
         date,
         type: 'TAKE_PRACTICE_QUIZ',
-        title: 'Hoàn thành 1 bài kiểm tra hoặc ôn lỗi sai (Quiz)',
+        title: 'Hoàn thành 1 bài kiểm tra kiến thức bất kỳ (Quiz) 📝',
         targetCount: 1,
-        currentCount: tookTestToday ? 1 : 0,
-        isCompleted: tookTestToday,
+        currentCount: flags.tookTestToday ? 1 : 0,
+        isCompleted: flags.tookTestToday,
         actionUrl: targetSetId ? `/sets/${targetSetId}/test` : '/reviews',
         isAutoGenerated: true,
         createdAt: now,

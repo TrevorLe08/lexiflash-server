@@ -5,6 +5,8 @@ import { StreakService } from '../services/streak.service.js';
 import { UserService } from '../services/user.service.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import { getParam } from '../utils/params.js';
+import { mockDb } from '../db/mockDb.js';
+import { ApiError } from '../utils/apiError.js';
 
 export class StudyController {
   static async getFlashcards(req: Request, res: Response, next: NextFunction) {
@@ -13,8 +15,9 @@ export class StudyController {
       const shuffle = req.query['shuffle'] === 'true';
       const starredOnly = req.query['starredOnly'] === 'true';
       const userId = req.user?.userId;
+      const password = req.query['password'] as string | undefined;
 
-      let cards = await CardService.getCardsBySetId(setId);
+      let cards = await CardService.getCardsBySetId(setId, userId, password);
 
       if (starredOnly && userId) {
         const dueReviews = await SrsService.getDueReviewCards(userId, setId);
@@ -124,7 +127,55 @@ export class StudyController {
   static async recordStreak(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.userId;
+      const today = StreakService.getTodayDateString();
+
+      // Verify that user has genuine study activity recorded today
+      let hasActivityToday = false;
+
+      // 1. Check study sessions today
+      for (const session of mockDb.studySessions.values()) {
+        if (session.userId === userId && session.completedAt) {
+          const sessionDateStr =
+            typeof session.completedAt === 'string'
+              ? session.completedAt
+              : new Date(session.completedAt).toISOString();
+          if (sessionDateStr.startsWith(today)) {
+            hasActivityToday = true;
+            break;
+          }
+        }
+      }
+
+      // 2. Check user card progress updated today
+      if (!hasActivityToday) {
+        for (const prog of mockDb.userCardProgress.values()) {
+          if (prog.userId === userId && prog.lastStudiedAt) {
+            const progDateStr =
+              typeof prog.lastStudiedAt === 'string'
+                ? prog.lastStudiedAt
+                : new Date(prog.lastStudiedAt).toISOString();
+            if (progDateStr.startsWith(today)) {
+              hasActivityToday = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!hasActivityToday) {
+        throw ApiError.badRequest(
+          'Cannot record streak: No study sessions or reviewed flashcards found for today'
+        );
+      }
+
       const result = await StreakService.recordStudyActivity(userId);
+      if (
+        !result.streakIncreased &&
+        !result.streakMaintained &&
+        result.streakInfo.isStreakActiveToday
+      ) {
+        result.streakMaintained = true;
+      }
       return ApiResponse.success(res, result, 'Streak activity recorded');
     } catch (error) {
       next(error);

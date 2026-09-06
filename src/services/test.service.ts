@@ -3,6 +3,7 @@ import {
   QuestionType,
   StudyMode,
   CardStudyStatus,
+  PrivacyLevel,
 } from '../config/constants.js';
 import {
   GenerateTestOptions,
@@ -46,6 +47,20 @@ export class TestService {
       throw ApiError.notFound('Study set not found');
     }
 
+    const isOwner = userId && set.creatorId === userId;
+    if (!isOwner) {
+      if (set.privacy === PrivacyLevel.PRIVATE) {
+        throw ApiError.forbidden('This study set is private');
+      }
+      if (set.privacy === PrivacyLevel.PASSWORD) {
+        if (!options.password || options.password !== set.password) {
+          throw ApiError.forbidden(
+            'Invalid password for this protected study set'
+          );
+        }
+      }
+    }
+
     let cards: Card[] = [];
     for (const c of mockDb.cards.values()) {
       if (c.studySetId === setId) {
@@ -53,9 +68,9 @@ export class TestService {
       }
     }
 
-    if (cards.length < 2) {
+    if (cards.length < 1) {
       throw ApiError.badRequest(
-        'Study set must have at least 2 cards to generate a test'
+        'Study set must have at least 1 card to generate a test'
       );
     }
 
@@ -69,24 +84,38 @@ export class TestService {
           .map((p) => p.cardId)
       );
       const filtered = cards.filter((c) => starredCardIds.has(c.id));
-      if (filtered.length >= 2) {
+      if (filtered.length >= 1) {
         cards = filtered;
       }
     }
 
     const shuffledCards = this.shuffle(cards);
-    const requestedCount = Math.min(
-      options.questionCount || 10,
-      shuffledCards.length
+    const requestedCount = Math.max(
+      1,
+      Math.min(options.questionCount || 10, shuffledCards.length)
     );
     const selectedCards = shuffledCards.slice(0, requestedCount);
-    const allowedTypes = options.questionTypes?.length
+    let allowedTypes = options.questionTypes?.length
       ? options.questionTypes
       : [
           QuestionType.MULTIPLE_CHOICE,
           QuestionType.TRUE_FALSE,
           QuestionType.WRITTEN,
         ];
+
+    // Enforce business rules based on card count:
+    // 1 card: only written is possible
+    if (cards.length === 1) {
+      allowedTypes = [QuestionType.WRITTEN];
+    } else if (cards.length === 2) {
+      // 2 cards: lock multiple choice (needs min 3 cards)
+      allowedTypes = allowedTypes.filter(
+        (t) => t !== QuestionType.MULTIPLE_CHOICE
+      );
+      if (allowedTypes.length === 0) {
+        allowedTypes = [QuestionType.TRUE_FALSE, QuestionType.WRITTEN];
+      }
+    }
 
     const questions: TestQuestion[] = [];
     const allDefinitions = Array.from(mockDb.cards.values()).map(
@@ -171,10 +200,10 @@ export class TestService {
     const testId = generateId('tst');
     activeTestsCache.set(testId, { questions, studySetId: setId });
 
-    // Client receives questions without correct answers
+    // Client receives questions without correct answers and with masked cardId to prevent answer disclosure
     const clientQuestions = questions.map((q) => ({
       id: q.id,
-      cardId: q.cardId,
+      cardId: '',
       type: q.type,
       prompt: q.prompt,
       options: q.options,

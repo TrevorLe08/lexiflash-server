@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { UserRole } from '../config/constants.js';
 
 export const updateProfileSchema = z.object({
   body: z.object({
@@ -28,5 +29,11 @@ export const changeEmailSchema = z.object({
   body: z.object({
     newEmail: z.string().email('Email không đúng định dạng'),
     password: z.string().min(1, 'Vui lòng nhập mật khẩu xác nhận'),
+  }),
+});
+
+export const updateUserRoleSchema = z.object({
+  body: z.object({
+    role: z.nativeEnum(UserRole),
   }),
 });

@@ -7,18 +7,25 @@ import { UserCardProgressModel } from '../models/UserCardProgress.model.js';
 import { CardStudyStatus } from '../config/constants.js';
 
 import { initialUsersSeed } from './seeds/users.seed.js';
-import { initialStudySetsSeed, initialCardsSeed } from './seeds/studySets.seed.js';
+import {
+  initialStudySetsSeed,
+  initialCardsSeed,
+} from './seeds/studySets.seed.js';
 import { initialFoldersSeed } from './seeds/folders.seed.js';
 import { initialClassesSeed } from './seeds/classes.seed.js';
 
 export async function seedDefaultDataIfEmpty() {
   const userCount = await UserModel.countDocuments();
   if (userCount > 0) {
-    console.log(`[MongoDB] Database already contains ${userCount} users. Skipping auto-seed.`);
+    console.log(
+      `[MongoDB] Database already contains ${userCount} users. Skipping auto-seed.`
+    );
     return;
   }
 
-  console.log('[MongoDB] Empty database detected. Seeding initial default data into MongoDB Atlas...');
+  console.log(
+    '[MongoDB] Empty database detected. Seeding initial default data into MongoDB Atlas...'
+  );
 
   try {
     // 1. Seed Users
@@ -27,7 +34,9 @@ export async function seedDefaultDataIfEmpty() {
 
     // 2. Seed StudySets
     await StudySetModel.insertMany(initialStudySetsSeed);
-    console.log(`[MongoDB] Seeded ${initialStudySetsSeed.length} default study sets.`);
+    console.log(
+      `[MongoDB] Seeded ${initialStudySetsSeed.length} default study sets.`
+    );
 
     // 3. Seed Cards
     await CardModel.insertMany(initialCardsSeed);
@@ -35,11 +44,15 @@ export async function seedDefaultDataIfEmpty() {
 
     // 4. Seed Folders
     await FolderModel.insertMany(initialFoldersSeed);
-    console.log(`[MongoDB] Seeded ${initialFoldersSeed.length} default folders.`);
+    console.log(
+      `[MongoDB] Seeded ${initialFoldersSeed.length} default folders.`
+    );
 
     // 5. Seed Classes
     await ClassModel.insertMany(initialClassesSeed);
-    console.log(`[MongoDB] Seeded ${initialClassesSeed.length} default classes.`);
+    console.log(
+      `[MongoDB] Seeded ${initialClassesSeed.length} default classes.`
+    );
 
     // 6. Initial User Progress
     const initialProgress = [
@@ -87,9 +100,13 @@ export async function seedDefaultDataIfEmpty() {
       },
     ];
     await UserCardProgressModel.insertMany(initialProgress);
-    console.log(`[MongoDB] Seeded ${initialProgress.length} user progress records.`);
+    console.log(
+      `[MongoDB] Seeded ${initialProgress.length} user progress records.`
+    );
 
-    console.log('✅ [MongoDB] All initial default data seeded successfully into MongoDB Atlas!');
+    console.log(
+      '✅ [MongoDB] All initial default data seeded successfully into MongoDB Atlas!'
+    );
   } catch (error) {
     console.error('❌ [MongoDB] Error seeding initial data:', error);
   }

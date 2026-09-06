@@ -26,7 +26,6 @@ export class AuthService {
     username: string;
     password: string;
     name: string;
-    role?: UserRole;
     avatarUrl?: string;
     bio?: string;
   }): Promise<{
@@ -62,7 +61,7 @@ export class AuthService {
           username
         )}`,
       bio: input.bio || '',
-      role: input.role || UserRole.USER,
+      role: UserRole.USER,
       streakCount: 0,
       lastStudyDate: undefined,
       bookmarkedSetIds: [],
@@ -126,8 +125,7 @@ export class AuthService {
     accessToken: string;
     refreshToken: string;
   }> {
-    const rawId =
-      input.loginIdentifier || input.username || input.email || '';
+    const rawId = input.loginIdentifier || input.username || input.email || '';
     const identifier = rawId.trim().toLowerCase();
     let foundUser: User | undefined;
 
@@ -318,7 +316,10 @@ export class AuthService {
 
     // Generate 32 bytes random reset token
     const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
     const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes validity
 
     user.resetPasswordToken = tokenHash;
@@ -355,7 +356,10 @@ export class AuthService {
       throw ApiError.badRequest('Invalid or expired password reset link');
     }
 
-    const tokenHash = crypto.createHash('sha256').update(input.token.trim()).digest('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(input.token.trim())
+      .digest('hex');
     if (tokenHash !== user.resetPasswordToken) {
       throw ApiError.badRequest('Invalid or expired password reset link');
     }
@@ -392,7 +396,9 @@ export class AuthService {
 
     const isMatch = await comparePassword(input.oldPassword, user.passwordHash);
     if (!isMatch) {
-      throw ApiError.badRequest('Mật khẩu hiện tại không chính xác (Current password is incorrect)');
+      throw ApiError.badRequest(
+        'Mật khẩu hiện tại không chính xác (Current password is incorrect)'
+      );
     }
 
     if (input.oldPassword === input.newPassword) {
@@ -404,5 +410,12 @@ export class AuthService {
     user.passwordHash = await hashPassword(input.newPassword);
     user.updatedAt = new Date().toISOString();
     mockDb.users.set(user.id, user);
+
+    // Invalidate any active refresh tokens for maximum security
+    for (const [id, rtk] of mockDb.refreshTokens.entries()) {
+      if (rtk.userId === user.id) {
+        mockDb.refreshTokens.delete(id);
+      }
+    }
   }
 }

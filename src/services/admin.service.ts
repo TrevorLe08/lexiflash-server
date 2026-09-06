@@ -13,10 +13,7 @@ import { ClassService } from './class.service.js';
 import { StreakService } from './streak.service.js';
 import { ApiError } from '../utils/apiError.js';
 import { paginateArray, PaginatedResult } from '../utils/pagination.js';
-import {
-  isUserVip,
-  countUserTotalCards,
-} from '../utils/user.utils.js';
+import { isUserVip, countUserTotalCards } from '../utils/user.utils.js';
 
 export interface AdminUserListItem {
   id: string;
@@ -158,6 +155,7 @@ export class AdminService {
       [StudyMode.WRITE]: 0,
       [StudyMode.TEST]: 0,
       [StudyMode.MATCH]: 0,
+      [StudyMode.CLOZE]: 0,
     };
 
     for (const session of allSessions) {
@@ -301,10 +299,14 @@ export class AdminService {
 
     if (vipFilter && vipFilter !== 'ALL') {
       users = users.filter((u) => {
-        if (vipFilter === 'FREE') return !isUserVip(u) && u.role !== UserRole.ADMIN;
-        if (vipFilter === 'VIP_ALL' || vipFilter === 'VIP') return isUserVip(u) && u.role !== UserRole.ADMIN;
-        if (vipFilter === '1_YEAR' || vipFilter === 'VIP_DIAMOND') return isUserVip(u) && u.vipPlan === '1_YEAR';
-        if (vipFilter === '1_MONTH' || vipFilter === 'VIP_GOLD') return isUserVip(u) && u.vipPlan === '1_MONTH';
+        if (vipFilter === 'FREE')
+          return !isUserVip(u) && u.role !== UserRole.ADMIN;
+        if (vipFilter === 'VIP_ALL' || vipFilter === 'VIP')
+          return isUserVip(u) && u.role !== UserRole.ADMIN;
+        if (vipFilter === '1_YEAR' || vipFilter === 'VIP_DIAMOND')
+          return isUserVip(u) && u.vipPlan === '1_YEAR';
+        if (vipFilter === '1_MONTH' || vipFilter === 'VIP_GOLD')
+          return isUserVip(u) && u.vipPlan === '1_MONTH';
         if (vipFilter === 'ADMIN') return u.role === UserRole.ADMIN;
         return true;
       });
@@ -668,7 +670,9 @@ export class AdminService {
     const sanitized = Array.from(
       new Set(
         topics
-          .map((t) => (typeof t === 'string' ? t.trim().replace(/^#+/, '') : ''))
+          .map((t) =>
+            typeof t === 'string' ? t.trim().replace(/^#+/, '') : ''
+          )
           .filter((t) => t.length > 0 && t.length <= 50)
       )
     );
@@ -680,4 +684,3 @@ export class AdminService {
     return finalTopics;
   }
 }
-

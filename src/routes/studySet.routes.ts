@@ -42,7 +42,12 @@ router.get(
 );
 router.get('/bookmarked', authenticate, StudySetController.getBookmarked);
 router.get('/:id', optionalAuth, StudySetController.getById);
-router.get('/:setId/cards', cardReadLimiter, CardController.getCardsBySetId);
+router.get(
+  '/:setId/cards',
+  optionalAuth,
+  cardReadLimiter,
+  CardController.getCardsBySetId
+);
 
 // Authenticated routes
 router.post(

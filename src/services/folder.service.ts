@@ -10,6 +10,7 @@ import { ApiError } from '../utils/apiError.js';
 import { StudySetService } from './studySet.service.js';
 import { StudySetWithDetails } from '../types/studySet.types.js';
 import { paginateArray, PaginatedResult } from '../utils/pagination.js';
+import { PrivacyLevel } from '../config/constants.js';
 
 export class FolderService {
   static populateFolderDetails(
@@ -84,10 +85,15 @@ export class FolderService {
     const now = new Date().toISOString();
     const folderId = generateId('fld');
 
-    // Filter valid set IDs
-    const validSetIds = (input.studySetIds || []).filter((sId) =>
-      mockDb.studySets.has(sId)
-    );
+    // Filter valid set IDs - only allow if set is PUBLIC or owned by user
+    const validSetIds = (input.studySetIds || []).filter((sId) => {
+      const targetSet = mockDb.studySets.get(sId);
+      return (
+        targetSet &&
+        (targetSet.creatorId === userId ||
+          targetSet.privacy === PrivacyLevel.PUBLIC)
+      );
+    });
 
     const newFolder: Folder = {
       id: folderId,
@@ -154,8 +160,20 @@ export class FolderService {
     }
 
     for (const setId of setIds) {
-      if (mockDb.studySets.has(setId) && !folder.studySetIds.includes(setId)) {
-        folder.studySetIds.push(setId);
+      const targetSet = mockDb.studySets.get(setId);
+      if (targetSet) {
+        if (
+          targetSet.creatorId === userId ||
+          targetSet.privacy === PrivacyLevel.PUBLIC
+        ) {
+          if (!folder.studySetIds.includes(setId)) {
+            folder.studySetIds.push(setId);
+          }
+        } else {
+          throw ApiError.forbidden(
+            'Cannot add private or restricted study sets owned by other users'
+          );
+        }
       }
     }
 

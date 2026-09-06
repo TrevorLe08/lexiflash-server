@@ -21,10 +21,34 @@ import apiRouter from './routes/index.js';
 export const createApp = (): Express => {
   const app = express();
 
-  // Basic Middlewares
+  // Trust proxy for Render/Vercel reverse proxies (vital for rate-limiting by client IP)
+  app.set('trust proxy', 1);
+
+  // Strict CORS policy
+  const allowedOrigins = [
+    ENV.CLIENT_URL,
+    'http://localhost:3000',
+    'http://localhost:5173',
+  ].filter(Boolean);
+
   app.use(
     cors({
-      origin: '*', // Allow all origins for development
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, server-to-server)
+        if (!origin) return callback(null, true);
+
+        const isAllowed =
+          ENV.NODE_ENV === 'development' ||
+          allowedOrigins.includes(origin) ||
+          origin.endsWith('.vercel.app');
+
+        if (isAllowed) {
+          return callback(null, true);
+        }
+        return callback(
+          new ApiError(403, `CORS blocked: Origin ${origin} is not allowed`)
+        );
+      },
       credentials: true,
     })
   );
@@ -76,31 +100,33 @@ export const createApp = (): Express => {
     });
   });
 
-  // Development helper: Reset mock database and MongoDB Atlas to default seeds
-  app.post('/api/v1/reset-mock-db', async (_req: Request, res: Response) => {
-    mockDb.seedDefaults();
-    if (isMongoConnected()) {
-      try {
-        await Promise.all([
-          UserModel.deleteMany({}),
-          StudySetModel.deleteMany({}),
-          CardModel.deleteMany({}),
-          FolderModel.deleteMany({}),
-          ClassModel.deleteMany({}),
-          UserCardProgressModel.deleteMany({}),
-        ]);
-        await seedDefaultDataIfEmpty();
-        await mockDb.loadFromMongo();
-      } catch (err: any) {
-        console.error('Error resetting MongoDB Atlas:', err);
+  // Development ONLY helper: Reset mock database and MongoDB Atlas to default seeds (DISABLED in production)
+  if (ENV.NODE_ENV === 'development') {
+    app.post('/api/v1/reset-mock-db', async (_req: Request, res: Response) => {
+      mockDb.seedDefaults();
+      if (isMongoConnected()) {
+        try {
+          await Promise.all([
+            UserModel.deleteMany({}),
+            StudySetModel.deleteMany({}),
+            CardModel.deleteMany({}),
+            FolderModel.deleteMany({}),
+            ClassModel.deleteMany({}),
+            UserCardProgressModel.deleteMany({}),
+          ]);
+          await seedDefaultDataIfEmpty();
+          await mockDb.loadFromMongo();
+        } catch (err: any) {
+          console.error('Error resetting MongoDB Atlas:', err);
+        }
       }
-    }
-    return ApiResponse.success(
-      res,
-      null,
-      'Database has been reset to default seeds in MongoDB Atlas'
-    );
-  });
+      return ApiResponse.success(
+        res,
+        null,
+        'Database has been reset to default seeds in MongoDB Atlas'
+      );
+    });
+  }
 
   // Main API Router
   app.use('/api/v1', apiRouter);

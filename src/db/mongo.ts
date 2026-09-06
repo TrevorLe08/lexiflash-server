@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { ENV } from '../config/env.js';
 import { seedDefaultDataIfEmpty } from './mongoSeeder.js';
+import { autoMigrateDatabase } from './mongoMigrator.js';
+import { UserModel } from '../models/User.model.js';
 
 let isConnected = false;
 
@@ -10,14 +12,18 @@ export async function connectDatabase(): Promise<typeof mongoose | null> {
   }
 
   if (!ENV.MONGODB_URI) {
-    console.warn('⚠️ [MongoDB] MONGODB_URI is not defined in environment variables. Running in memory fallback mode.');
+    console.warn(
+      '⚠️ [MongoDB] MONGODB_URI is not defined in environment variables. Running in memory fallback mode.'
+    );
     return null;
   }
 
   try {
     let uri = ENV.MONGODB_URI;
     if (!uri.includes('?')) {
-      uri = uri.replace(/\/+$/, '') + `/${ENV.MONGODB_DB_NAME}?retryWrites=true&w=majority`;
+      uri =
+        uri.replace(/\/+$/, '') +
+        `/${ENV.MONGODB_DB_NAME}?retryWrites=true&w=majority`;
     }
 
     const maskedUri = uri.replace(/:([^:@]+)@/, ':****@');
@@ -31,14 +37,20 @@ export async function connectDatabase(): Promise<typeof mongoose | null> {
     });
 
     isConnected = true;
-    console.log(`✅ [MongoDB] Connected successfully to MongoDB Atlas! (Database: ${ENV.MONGODB_DB_NAME})`);
+    console.log(
+      `✅ [MongoDB] Connected successfully to MongoDB Atlas! (Database: ${ENV.MONGODB_DB_NAME})`
+    );
 
     // Auto-seed initial default data if database is empty
     await seedDefaultDataIfEmpty();
 
+    // Auto-migrate and sync schema fields for production / existing databases
+    await autoMigrateDatabase();
+
     return connection;
-  } catch (error: any) {
-    console.error('❌ [MongoDB] Connection error:', error.message);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('❌ [MongoDB] Connection error:', msg);
     // Don't crash immediately, allow graceful fallback or retry
     return null;
   }
@@ -50,8 +62,9 @@ export async function disconnectDatabase(): Promise<void> {
     await mongoose.disconnect();
     isConnected = false;
     console.log('🔌 [MongoDB] Disconnected from MongoDB Atlas.');
-  } catch (error: any) {
-    console.error('❌ [MongoDB] Error disconnecting from MongoDB:', error.message);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('❌ [MongoDB] Error disconnecting from MongoDB:', msg);
   }
 }
 
@@ -59,7 +72,7 @@ export function isMongoConnected(): boolean {
   return isConnected && mongoose.connection.readyState === 1;
 }
 
-let userChangeStream: any = null;
+let userChangeStream: ReturnType<typeof UserModel.watch> | null = null;
 
 export function setupChangeStreams(onUserChange?: () => void) {
   try {
@@ -80,4 +93,3 @@ export function setupChangeStreams(onUserChange?: () => void) {
     // Ignore if not supported
   }
 }
-

@@ -11,7 +11,9 @@ export class CardController {
   ) {
     try {
       const setId = getParam(req.params['setId']);
-      const cards = await CardService.getCardsBySetId(setId);
+      const userId = req.user?.userId;
+      const password = req.query['password'] as string | undefined;
+      const cards = await CardService.getCardsBySetId(setId, userId, password);
       return ApiResponse.success(res, cards, 'Cards retrieved');
     } catch (error) {
       next(error);

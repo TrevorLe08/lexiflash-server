@@ -34,10 +34,14 @@ const dailyQuestSchema = new Schema<DailyQuestDocument>(
   }
 );
 dailyQuestSchema.index({ userId: 1, date: 1 });
-export const DailyQuestModel = mongoose.model<DailyQuestDocument>('DailyQuest', dailyQuestSchema);
+export const DailyQuestModel = mongoose.model<DailyQuestDocument>(
+  'DailyQuest',
+  dailyQuestSchema
+);
 
 // 2. StudySession Model
-export interface StudySessionDocument extends Omit<StudySession, 'id'>, Document {
+export interface StudySessionDocument
+  extends Omit<StudySession, 'id'>, Document {
   id: string;
 }
 
@@ -64,10 +68,14 @@ const studySessionSchema = new Schema<StudySessionDocument>(
     },
   }
 );
-export const StudySessionModel = mongoose.model<StudySessionDocument>('StudySession', studySessionSchema);
+export const StudySessionModel = mongoose.model<StudySessionDocument>(
+  'StudySession',
+  studySessionSchema
+);
 
 // 3. StudyRoomSession Model
-export interface StudyRoomSessionDocument extends Omit<StudyRoomSession, 'id'>, Document {
+export interface StudyRoomSessionDocument
+  extends Omit<StudyRoomSession, 'id'>, Document {
   id: string;
 }
 
@@ -143,10 +151,14 @@ const testHistorySchema = new Schema<TestHistoryDocument>(
     },
   }
 );
-export const TestHistoryModel = mongoose.model<TestHistoryDocument>('TestHistory', testHistorySchema);
+export const TestHistoryModel = mongoose.model<TestHistoryDocument>(
+  'TestHistory',
+  testHistorySchema
+);
 
 // 5. MatchLeaderboard Model
-export interface MatchLeaderboardDocument extends Omit<MatchLeaderboardEntry, 'id'>, Document {
+export interface MatchLeaderboardDocument
+  extends Omit<MatchLeaderboardEntry, 'id'>, Document {
   id: string;
 }
 

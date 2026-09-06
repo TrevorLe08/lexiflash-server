@@ -2,7 +2,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 import { UserCardProgress } from '../types/study.types.js';
 import { CardStudyStatus } from '../config/constants.js';
 
-export interface UserCardProgressDocument extends Omit<UserCardProgress, 'id'>, Document {
+export interface UserCardProgressDocument
+  extends Omit<UserCardProgress, 'id'>, Document {
   id: string;
 }
 

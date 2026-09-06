@@ -92,11 +92,7 @@ export class AuthController {
         oldPassword,
         newPassword,
       });
-      return ApiResponse.success(
-        res,
-        null,
-        'Đổi mật khẩu thành công!'
-      );
+      return ApiResponse.success(res, null, 'Đổi mật khẩu thành công!');
     } catch (error) {
       next(error);
     }

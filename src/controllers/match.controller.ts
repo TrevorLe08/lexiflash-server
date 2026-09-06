@@ -10,7 +10,14 @@ export class MatchController {
       const pairCount = req.query['pairCount']
         ? parseInt(req.query['pairCount'] as string, 10)
         : 6;
-      const data = await MatchService.getMatchTiles(setId, pairCount);
+      const userId = req.user?.userId;
+      const password = req.query['password'] as string | undefined;
+      const data = await MatchService.getMatchTiles(
+        setId,
+        pairCount,
+        userId,
+        password
+      );
       return ApiResponse.success(res, data, 'Match game tiles generated');
     } catch (error) {
       next(error);
@@ -21,12 +28,13 @@ export class MatchController {
     try {
       const setId = getParam(req.params['setId']);
       const userId = req.user!.userId;
-      const { timeRecordMs, matchedPairs } = req.body;
+      const { timeRecordMs, matchedPairs, sessionToken } = req.body;
       const result = await MatchService.submitScore(
         setId,
         timeRecordMs,
         matchedPairs,
-        userId
+        userId,
+        sessionToken
       );
       return ApiResponse.success(
         res,
@@ -43,7 +51,8 @@ export class MatchController {
   static async getLeaderboard(req: Request, res: Response, next: NextFunction) {
     try {
       const setId = getParam(req.params['setId']);
-      const leaderboard = await MatchService.getLeaderboard(setId);
+      const userId = req.user?.userId;
+      const leaderboard = await MatchService.getLeaderboard(setId, userId);
       return ApiResponse.success(
         res,
         leaderboard,

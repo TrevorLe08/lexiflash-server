@@ -1,6 +1,10 @@
 import { mockDb } from '../db/mockDb.js';
 import { UserProfileResponse } from '../types/user.types.js';
-import { CardStudyStatus, PrivacyLevel } from '../config/constants.js';
+import {
+  CardStudyStatus,
+  PrivacyLevel,
+  UserRole,
+} from '../config/constants.js';
 import { ApiError } from '../utils/apiError.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
 import { StudySetService } from './studySet.service.js';
@@ -8,10 +12,7 @@ import { FolderService } from './folder.service.js';
 import { StudySetWithDetails } from '../types/studySet.types.js';
 import { FolderWithDetails } from '../types/folder.types.js';
 import { StreakService } from './streak.service.js';
-import {
-  isUserVip,
-  countUserTotalCards,
-} from '../utils/user.utils.js';
+import { isUserVip, countUserTotalCards } from '../utils/user.utils.js';
 
 export class UserService {
   static async getProfile(
@@ -107,9 +108,14 @@ export class UserService {
 
     const totalCardsOwned = countUserTotalCards(targetUserId);
 
+    const isOwnerOrAdmin =
+      viewerId &&
+      (viewerId === targetUserId ||
+        mockDb.users.get(viewerId)?.role === UserRole.ADMIN);
+
     return {
       id: user.id,
-      email: user.email,
+      email: isOwnerOrAdmin ? user.email : '',
       username: user.username,
       name: user.name,
       avatarUrl: user.avatarUrl,
@@ -117,8 +123,8 @@ export class UserService {
       role: user.role,
       isBanned: user.isBanned,
       isVip: isUserVip(user),
-      vipExpiresAt: user.vipExpiresAt || null,
-      vipPlan: user.vipPlan || null,
+      vipExpiresAt: isOwnerOrAdmin ? user.vipExpiresAt || null : null,
+      vipPlan: isOwnerOrAdmin ? user.vipPlan || null : null,
       streakCount: streakInfo.streakCount,
       lastStudyDate: streakInfo.lastStudyDate,
       isStreakActiveToday: streakInfo.isStreakActiveToday,
@@ -176,11 +182,18 @@ export class UserService {
     user.passwordHash = await hashPassword(input.newPassword);
     user.updatedAt = new Date().toISOString();
     mockDb.users.set(user.id, user);
+
+    // Invalidate all existing refresh tokens for this user
+    for (const [id, rtk] of mockDb.refreshTokens.entries()) {
+      if (rtk.userId === user.id) {
+        mockDb.refreshTokens.delete(id);
+      }
+    }
   }
 
   static async changeEmail(
     userId: string,
-    input: { newEmail: string; password?: string }
+    input: { newEmail: string; password: string }
   ): Promise<UserProfileResponse> {
     const user = mockDb.users.get(userId);
     if (!user) {
@@ -195,15 +208,21 @@ export class UserService {
     // Check if new email is taken by another account
     for (const u of mockDb.users.values()) {
       if (u.id !== userId && u.email.toLowerCase() === normalizedNewEmail) {
-        throw ApiError.conflict('Email này đã được sử dụng bởi một tài khoản khác');
+        throw ApiError.conflict(
+          'Email này đã được sử dụng bởi một tài khoản khác'
+        );
       }
     }
 
-    if (input.password) {
-      const isMatch = await comparePassword(input.password, user.passwordHash);
-      if (!isMatch) {
-        throw ApiError.badRequest('Mật khẩu xác nhận không chính xác');
-      }
+    if (!input.password) {
+      throw ApiError.badRequest(
+        'Vui lòng cung cấp mật khẩu hiện tại để xác nhận đổi email'
+      );
+    }
+
+    const isMatch = await comparePassword(input.password, user.passwordHash);
+    if (!isMatch) {
+      throw ApiError.badRequest('Mật khẩu xác nhận không chính xác');
     }
 
     user.email = normalizedNewEmail;

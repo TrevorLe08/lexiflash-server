@@ -25,11 +25,24 @@ export class StudySetService {
   ): StudySetWithDetails {
     const creator = mockDb.users.get(set.creatorId);
 
+    // Get starred card IDs for current user if logged in
+    const userStarredCardIds = new Set<string>();
+    if (currentUserId) {
+      for (const p of mockDb.userCardProgress.values()) {
+        if (p.userId === currentUserId && p.isStarred) {
+          userStarredCardIds.add(p.cardId);
+        }
+      }
+    }
+
     // Get all cards for this set, ordered by orderIndex
     const allCards: Card[] = [];
     for (const c of mockDb.cards.values()) {
       if (c.studySetId === set.id) {
-        allCards.push({ ...c });
+        allCards.push({
+          ...c,
+          isStarred: userStarredCardIds.has(c.id),
+        });
       }
     }
     allCards.sort((a, b) => a.orderIndex - b.orderIndex);
@@ -49,8 +62,11 @@ export class StudySetService {
     const starredList = set.starredUserIds || [];
     const bookmarkedList = set.bookmarkedUserIds || [];
 
+    const { password: _password, ...cleanSet } = set;
+
     return {
-      ...set,
+      ...cleanSet,
+      hasPassword: Boolean(_password),
       cards,
       cardCount: allCards.length,
       level: set.level || 'INTERMEDIATE',

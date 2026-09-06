@@ -13,6 +13,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "build": "tsc",
+    "db:migrate": "tsx src/scripts/migrate.ts",
     "test": "tsx src/verify_all.ts",
     "start": "node dist/server.js"
   },

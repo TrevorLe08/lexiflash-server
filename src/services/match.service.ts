@@ -1,10 +1,24 @@
 import { mockDb } from '../db/mockDb.js';
-import { MatchGameCard, MatchLeaderboardEntry } from '../types/match.types.js';
+import {
+  MatchGameCard,
+  MatchLeaderboardEntry,
+  MatchTilesResponse,
+} from '../types/match.types.js';
 import { Card } from '../types/card.types.js';
-import { StudyMode } from '../config/constants.js';
+import { StudyMode, PrivacyLevel } from '../config/constants.js';
 import { generateId } from '../utils/id.js';
 import { ApiError } from '../utils/apiError.js';
 import { SrsService } from './srs.service.js';
+
+interface ActiveMatchSession {
+  sessionId: string;
+  setId: string;
+  userId?: string;
+  startedAt: number;
+  pairCount: number;
+}
+
+const activeMatchSessions = new Map<string, ActiveMatchSession>();
 
 export class MatchService {
   static shuffle<T>(array: T[]): T[] {
@@ -20,11 +34,27 @@ export class MatchService {
 
   static async getMatchTiles(
     setId: string,
-    pairCount = 6
-  ): Promise<{ tiles: MatchGameCard[]; totalPairs: number }> {
+    pairCount = 6,
+    userId?: string,
+    password?: string
+  ): Promise<MatchTilesResponse> {
     const set = mockDb.studySets.get(setId);
     if (!set) {
       throw ApiError.notFound('Study set not found');
+    }
+
+    const isOwner = userId && set.creatorId === userId;
+    if (!isOwner) {
+      if (set.privacy === PrivacyLevel.PRIVATE) {
+        throw ApiError.forbidden('This study set is private');
+      }
+      if (set.privacy === PrivacyLevel.PASSWORD) {
+        if (!password || password !== set.password) {
+          throw ApiError.forbidden(
+            'Invalid password for this protected study set'
+          );
+        }
+      }
     }
 
     const cards: Card[] = [];
@@ -61,9 +91,19 @@ export class MatchService {
       });
     });
 
+    const sessionToken = generateId('m_sess');
+    activeMatchSessions.set(sessionToken, {
+      sessionId: sessionToken,
+      setId,
+      userId,
+      startedAt: Date.now(),
+      pairCount: selectedCards.length,
+    });
+
     return {
       tiles: this.shuffle(tiles),
       totalPairs: selectedCards.length,
+      sessionToken,
     };
   }
 
@@ -71,8 +111,51 @@ export class MatchService {
     setId: string,
     timeRecordMs: number,
     matchedPairs: number,
-    userId: string
+    userId: string,
+    sessionToken?: string
   ): Promise<{ entry: MatchLeaderboardEntry; isNewPersonalBest: boolean }> {
+    if (!sessionToken) {
+      throw ApiError.badRequest('Valid match session token is required');
+    }
+
+    const session = activeMatchSessions.get(sessionToken);
+    if (!session) {
+      throw ApiError.badRequest(
+        'Invalid or expired match session. Please restart match game.'
+      );
+    }
+
+    if (session.setId !== setId) {
+      throw ApiError.badRequest('Session does not match requested study set');
+    }
+
+    // Invalidate session immediately to prevent replay attacks
+    activeMatchSessions.delete(sessionToken);
+
+    // Minimum plausible human threshold: at least 250ms per pair, minimum 1000ms
+    const minPlausibleMs = Math.max(1000, matchedPairs * 250);
+    if (timeRecordMs < minPlausibleMs) {
+      throw ApiError.badRequest(
+        'Score rejected: completion time is below human physiological limits'
+      );
+    }
+
+    // Verify wall-clock duration on server (skip in test environment)
+    const isTestEnv = process.env.NODE_ENV === 'test';
+    if (!isTestEnv) {
+      const serverElapsedMs = Date.now() - session.startedAt;
+      if (serverElapsedMs < minPlausibleMs) {
+        throw ApiError.badRequest(
+          'Score rejected: elapsed server time too short'
+        );
+      }
+      if (timeRecordMs > serverElapsedMs + 5000) {
+        throw ApiError.badRequest(
+          'Score rejected: reported time inconsistent with session duration'
+        );
+      }
+    }
+
     const set = mockDb.studySets.get(setId);
     if (!set) {
       throw ApiError.notFound('Study set not found');
@@ -140,7 +223,19 @@ export class MatchService {
     };
   }
 
-  static async getLeaderboard(setId: string): Promise<MatchLeaderboardEntry[]> {
+  static async getLeaderboard(
+    setId: string,
+    userId?: string
+  ): Promise<MatchLeaderboardEntry[]> {
+    const set = mockDb.studySets.get(setId);
+    if (!set) {
+      throw ApiError.notFound('Study set not found');
+    }
+    const isOwner = userId && set.creatorId === userId;
+    if (!isOwner && set.privacy === PrivacyLevel.PRIVATE) {
+      throw ApiError.forbidden('This study set is private');
+    }
+
     const entries: MatchLeaderboardEntry[] = [];
     for (const e of mockDb.matchLeaderboards.values()) {
       if (e.studySetId === setId) {

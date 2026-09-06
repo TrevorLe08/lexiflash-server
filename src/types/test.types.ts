@@ -17,6 +17,7 @@ export interface GenerateTestOptions {
   questionTypes?: QuestionType[];
   starredOnly?: boolean;
   promptWith?: 'term' | 'definition' | 'both';
+  password?: string;
 }
 
 export interface GeneratedTest {

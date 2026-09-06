@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { UserRole } from '../config/constants.js';
 
 export const registerSchema = z.object({
   body: z.object({
@@ -23,7 +22,6 @@ export const registerSchema = z.object({
         'Password must contain at least one special character (!@#$%^&*...)'
       ),
     name: z.string().min(1, 'Name is required').max(100),
-    role: z.nativeEnum(UserRole).optional(),
     avatarUrl: z.string().url().optional(),
     bio: z.string().max(300).optional(),
   }),
@@ -41,8 +39,8 @@ export const loginSchema = z.object({
       (data) =>
         Boolean(
           (data.loginIdentifier && data.loginIdentifier.trim()) ||
-            (data.username && data.username.trim()) ||
-            (data.email && data.email.trim())
+          (data.username && data.username.trim()) ||
+          (data.email && data.email.trim())
         ),
       {
         message: 'Email, username, or loginIdentifier is required',

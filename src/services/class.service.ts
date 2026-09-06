@@ -6,7 +6,7 @@ import {
   CreateClassInput,
   UpdateClassInput,
 } from '../types/class.types.js';
-import { ClassRole, UserRole } from '../config/constants.js';
+import { ClassRole, UserRole, PrivacyLevel } from '../config/constants.js';
 import { generateId } from '../utils/id.js';
 import { ApiError } from '../utils/apiError.js';
 import { StudySetService } from './studySet.service.js';
@@ -310,11 +310,21 @@ export class ClassService {
       throw ApiError.forbidden('Members are not allowed to add study sets');
     }
 
-    // Add unique set IDs
+    // Add unique set IDs - only allow if set is PUBLIC or owned by current user
     const existingSetIds = new Set(cl.studySetIds);
     for (const sId of studySetIds) {
-      if (mockDb.studySets.has(sId)) {
-        existingSetIds.add(sId);
+      const targetSet = mockDb.studySets.get(sId);
+      if (targetSet) {
+        if (
+          targetSet.creatorId === userId ||
+          targetSet.privacy === PrivacyLevel.PUBLIC
+        ) {
+          existingSetIds.add(sId);
+        } else {
+          throw ApiError.forbidden(
+            'Cannot add private or restricted study sets owned by other users'
+          );
+        }
       }
     }
 

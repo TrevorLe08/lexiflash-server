@@ -31,4 +31,7 @@ const folderSchema = new Schema<FolderDocument>(
   }
 );
 
-export const FolderModel = mongoose.model<FolderDocument>('Folder', folderSchema);
+export const FolderModel = mongoose.model<FolderDocument>(
+  'Folder',
+  folderSchema
+);

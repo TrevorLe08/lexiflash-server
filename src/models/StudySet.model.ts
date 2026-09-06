@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { StudySet, StudyLevel } from '../types/studySet.types.js';
+import { StudySet } from '../types/studySet.types.js';
 import { PrivacyLevel } from '../config/constants.js';
 
 export interface StudySetDocument extends Omit<StudySet, 'id'>, Document {
@@ -49,4 +49,7 @@ const studySetSchema = new Schema<StudySetDocument>(
 // Full text search index
 studySetSchema.index({ title: 'text', description: 'text', tags: 'text' });
 
-export const StudySetModel = mongoose.model<StudySetDocument>('StudySet', studySetSchema);
+export const StudySetModel = mongoose.model<StudySetDocument>(
+  'StudySet',
+  studySetSchema
+);

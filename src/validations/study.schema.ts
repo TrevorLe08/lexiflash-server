@@ -17,6 +17,8 @@ export const recordStudySessionSchema = z.object({
     cardsCorrect: z.number().int().nonnegative(),
     cardsIncorrect: z.number().int().nonnegative(),
     timeSpentSeconds: z.number().int().nonnegative(),
+    correctCardIds: z.array(z.string()).optional(),
+    incorrectCardIds: z.array(z.string()).optional(),
   }),
 });
 
@@ -36,6 +38,7 @@ export const generateTestSchema = z.object({
       .enum(['term', 'definition', 'both'])
       .optional()
       .default('both'),
+    password: z.string().optional(),
   }),
 });
 
@@ -45,7 +48,7 @@ export const submitTestSchema = z.object({
     answers: z.array(
       z.object({
         questionId: z.string().min(1),
-        cardId: z.string().min(1),
+        cardId: z.string().optional().default(''),
         userAnswer: z.string(),
       })
     ),
@@ -54,6 +57,7 @@ export const submitTestSchema = z.object({
 
 export const submitMatchScoreSchema = z.object({
   body: z.object({
+    sessionToken: z.string().min(1, 'Valid match session token is required'),
     timeRecordMs: z
       .number()
       .int()

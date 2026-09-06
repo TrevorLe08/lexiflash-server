@@ -1,6 +1,10 @@
 import { createApp } from './app.js';
 import { ENV } from './config/env.js';
-import { connectDatabase, disconnectDatabase, setupChangeStreams } from './db/mongo.js';
+import {
+  connectDatabase,
+  disconnectDatabase,
+  setupChangeStreams,
+} from './db/mongo.js';
 import { mockDb } from './db/mockDb.js';
 import { StreakService } from './services/streak.service.js';
 
@@ -54,6 +58,18 @@ async function bootstrap() {
 
   // 2. Start Midnight Streak Rollover Scheduler
   startMidnightStreakScheduler();
+
+  // Security check for production JWT secrets
+  if (ENV.NODE_ENV === 'production') {
+    if (
+      ENV.JWT.ACCESS_SECRET === 'lexiflash_super_secret_access_key_2026' ||
+      ENV.JWT.REFRESH_SECRET === 'lexiflash_super_secret_refresh_key_2026'
+    ) {
+      console.warn(
+        '⚠️ [SECURITY ALERT] Production server is running with DEFAULT JWT secrets! Set JWT_ACCESS_SECRET and JWT_REFRESH_SECRET in environment variables immediately to prevent token forgery.'
+      );
+    }
+  }
 
   // 3. Initialize Express application
   const app = createApp();

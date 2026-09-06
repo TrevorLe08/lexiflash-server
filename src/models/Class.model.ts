@@ -9,7 +9,11 @@ export interface ClassDocument extends Omit<ClassGroup, 'id'>, Document {
 const classMemberSchema = new Schema(
   {
     userId: { type: String, required: true },
-    role: { type: String, enum: Object.values(ClassRole), default: ClassRole.MEMBER },
+    role: {
+      type: String,
+      enum: Object.values(ClassRole),
+      default: ClassRole.MEMBER,
+    },
     joinedAt: { type: String, required: true },
   },
   { _id: false }
@@ -22,7 +26,13 @@ const classSchema = new Schema<ClassDocument>(
     description: { type: String, default: '' },
     schoolName: { type: String, default: '' },
     creatorId: { type: String, required: true, index: true },
-    joinCode: { type: String, required: true, unique: true, index: true },
+    joinCode: {
+      type: String,
+      required: true,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     allowMemberAddSets: { type: Boolean, default: true },
     allowMemberInvite: { type: Boolean, default: true },
     members: { type: [classMemberSchema], default: [] },
@@ -31,7 +41,7 @@ const classSchema = new Schema<ClassDocument>(
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret: any) => {
+      transform: (_doc, ret: Record<string, unknown>) => {
         delete ret._id;
         delete ret.__v;
         return ret;

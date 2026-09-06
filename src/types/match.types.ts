@@ -19,3 +19,9 @@ export interface MatchLeaderboardEntry {
   matchedPairs: number;
   createdAt: string;
 }
+
+export interface MatchTilesResponse {
+  tiles: MatchGameCard[];
+  totalPairs: number;
+  sessionToken: string;
+}
