@@ -9,6 +9,7 @@ import {
   SearchUserResult,
 } from '../types/search.types.js';
 import { StudySetWithDetails } from '../types/studySet.types.js';
+import { Card } from '../types/card.types.js';
 import { FolderWithDetails } from '../types/folder.types.js';
 import { ClassWithDetails } from '../types/class.types.js';
 
@@ -48,6 +49,17 @@ export class SearchService {
         score: number;
       }> = [];
 
+      // Pre-index cards by studySetId to eliminate O(S * C) nested iteration
+      const cardsBySetId = new Map<string, Card[]>();
+      for (const card of mockDb.cards.values()) {
+        const existing = cardsBySetId.get(card.studySetId);
+        if (existing) {
+          existing.push(card);
+        } else {
+          cardsBySetId.set(card.studySetId, [card]);
+        }
+      }
+
       for (const set of mockDb.studySets.values()) {
         // Privacy check: UNLISTED sets must never appear in global search results
         if (set.privacy === PrivacyLevel.UNLISTED) {
@@ -80,8 +92,9 @@ export class SearchService {
 
         // Sub-card search (match card terms or definitions)
         let cardMatches = 0;
-        for (const card of mockDb.cards.values()) {
-          if (card.studySetId === set.id) {
+        const setCards = cardsBySetId.get(set.id);
+        if (setCards) {
+          for (const card of setCards) {
             const termLower = card.term.toLowerCase();
             const defLower = card.definition.toLowerCase();
             if (termLower.includes(q) || defLower.includes(q)) {

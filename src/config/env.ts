@@ -26,4 +26,18 @@ export const ENV = {
   ),
   EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'LexiFlash Support',
   EMAIL_FROM: process.env.EMAIL_FROM || '',
+  CLOUDINARY: {
+    CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
+    API_KEY: process.env.CLOUDINARY_API_KEY || '',
+    API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
+  },
 };
+
+if (
+  ENV.NODE_ENV === 'production' &&
+  (!process.env.JWT_ACCESS_SECRET || !process.env.JWT_REFRESH_SECRET)
+) {
+  console.warn(
+    '[SECURITY WARNING] Production environment detected without explicit JWT_ACCESS_SECRET or JWT_REFRESH_SECRET configured! Using default fallback keys is insecure.'
+  );
+}

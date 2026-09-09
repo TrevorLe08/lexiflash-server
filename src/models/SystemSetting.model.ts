@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface SystemSettingDocument extends Document {
   key: string;
-  value: any;
+  value: unknown;
   updatedAt: Date;
 }
 

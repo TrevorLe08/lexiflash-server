@@ -30,7 +30,7 @@ const userCardProgressSchema = new Schema<UserCardProgressDocument>(
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret: any) => {
+      transform: (_doc, ret: Record<string, unknown>) => {
         delete ret._id;
         delete ret.__v;
         return ret;

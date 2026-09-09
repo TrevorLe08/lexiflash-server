@@ -13,6 +13,7 @@ import { StudySetWithDetails } from '../types/studySet.types.js';
 import { FolderWithDetails } from '../types/folder.types.js';
 import { StreakService } from './streak.service.js';
 import { isUserVip, countUserTotalCards } from '../utils/user.utils.js';
+import { UploadService } from './upload.service.js';
 
 export class UserService {
   static async getProfile(
@@ -154,7 +155,17 @@ export class UserService {
     }
 
     if (data.name !== undefined) user.name = data.name;
-    if (data.avatarUrl !== undefined) user.avatarUrl = data.avatarUrl;
+    if (data.avatarUrl !== undefined) {
+      let finalAvatarUrl = data.avatarUrl;
+      // If user uploaded a custom base64 image, upload to Cloudinary
+      if (finalAvatarUrl && finalAvatarUrl.startsWith('data:image/')) {
+        finalAvatarUrl = await UploadService.uploadAvatar(
+          finalAvatarUrl,
+          userId
+        );
+      }
+      user.avatarUrl = finalAvatarUrl;
+    }
     if (data.bio !== undefined) user.bio = data.bio;
     user.updatedAt = new Date().toISOString();
 

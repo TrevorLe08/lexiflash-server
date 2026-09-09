@@ -1,7 +1,10 @@
 import mongoose from 'mongoose';
 import { ENV } from '../config/env.js';
 import { seedDefaultDataIfEmpty } from './mongoSeeder.js';
-import { autoMigrateDatabase } from './mongoMigrator.js';
+import {
+  autoMigrateDatabase,
+  startDatabaseMaintenanceScheduler,
+} from './mongoMigrator.js';
 import { UserModel } from '../models/User.model.js';
 
 let isConnected = false;
@@ -44,8 +47,11 @@ export async function connectDatabase(): Promise<typeof mongoose | null> {
     // Auto-seed initial default data if database is empty
     await seedDefaultDataIfEmpty();
 
-    // Auto-migrate and sync schema fields for production / existing databases
+    // Auto-migrate, sync schema fields, and apply storage optimizations for any database (clone or production)
     await autoMigrateDatabase();
+
+    // Start 24-hour recurring maintenance scheduler to keep storage perpetually lean
+    startDatabaseMaintenanceScheduler();
 
     return connection;
   } catch (error: unknown) {

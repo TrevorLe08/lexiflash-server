@@ -4,7 +4,19 @@ import { UserRole } from '../config/constants.js';
 export const updateProfileSchema = z.object({
   body: z.object({
     name: z.string().min(1).max(100).optional(),
-    avatarUrl: z.string().url().optional().or(z.literal('')),
+    avatarUrl: z
+      .string()
+      .max(5000000, 'Avatar image is too large')
+      .refine(
+        (val) =>
+          !val ||
+          val.startsWith('http://') ||
+          val.startsWith('https://') ||
+          val.startsWith('data:image/'),
+        { message: 'Avatar must be a valid HTTP/HTTPS URL or image data' }
+      )
+      .optional()
+      .or(z.literal('')),
     bio: z.string().max(300).optional(),
   }),
 });

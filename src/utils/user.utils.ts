@@ -20,14 +20,21 @@ export function isUserVip(user?: User | null): boolean {
  * Counts total vocabulary cards owned by a user across all their study sets.
  */
 export function countUserTotalCards(userId: string): number {
-  let count = 0;
+  const userSetIds = new Set<string>();
   for (const set of mockDb.studySets.values()) {
     if (set.creatorId === userId) {
-      for (const card of mockDb.cards.values()) {
-        if (card.studySetId === set.id) {
-          count++;
-        }
-      }
+      userSetIds.add(set.id);
+    }
+  }
+
+  if (userSetIds.size === 0) {
+    return 0;
+  }
+
+  let count = 0;
+  for (const card of mockDb.cards.values()) {
+    if (userSetIds.has(card.studySetId)) {
+      count++;
     }
   }
   return count;

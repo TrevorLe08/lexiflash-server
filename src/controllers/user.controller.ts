@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service.js';
+import { UploadService } from '../services/upload.service.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import { ApiError } from '../utils/apiError.js';
 import { getParam } from '../utils/params.js';
@@ -26,6 +27,24 @@ export class UserController {
       const userId = req.user!.userId;
       const updated = await UserService.updateProfile(userId, req.body);
       return ApiResponse.success(res, updated, 'Profile updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getAvatarUploadSignature(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const userId = req.user!.userId;
+      const signatureData = UploadService.generateAvatarSignature(userId);
+      return ApiResponse.success(
+        res,
+        signatureData,
+        'Avatar upload signature generated successfully'
+      );
     } catch (error) {
       next(error);
     }

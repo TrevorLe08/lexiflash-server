@@ -25,11 +25,9 @@ function startMidnightStreakScheduler() {
     setTimeout(async () => {
       try {
         await StreakService.recalculateAllUsers();
-      } catch (err: any) {
-        console.error(
-          'Error running midnight streak recalculation:',
-          err.message
-        );
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error('Error running midnight streak recalculation:', errorMsg);
       }
       scheduleNextMidnight();
     }, msUntilMidnight);

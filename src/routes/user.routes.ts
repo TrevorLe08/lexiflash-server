@@ -12,6 +12,11 @@ const router = Router();
 
 // Authenticated user private actions
 router.get('/me', authenticate, UserController.getProfile);
+router.get(
+  '/avatar-signature',
+  authenticate,
+  UserController.getAvatarUploadSignature
+);
 router.put(
   '/me',
   authenticate,

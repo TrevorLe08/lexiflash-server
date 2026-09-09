@@ -163,7 +163,10 @@ export class AuthService {
       throw ApiError.unauthorized('Invalid email/username or password');
     }
 
-    if (mockDb.maintenanceConfig?.isActive && foundUser.role !== UserRole.ADMIN) {
+    if (
+      mockDb.maintenanceConfig?.isActive &&
+      foundUser.role !== UserRole.ADMIN
+    ) {
       throw ApiError.forbidden(
         'Hệ thống đang trong chế độ bảo trì. Chỉ Quản trị viên mới có thể đăng nhập vào lúc này. Vui lòng quay lại sau!'
       );

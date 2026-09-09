@@ -25,7 +25,7 @@ const dailyQuestSchema = new Schema<DailyQuestDocument>(
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret: any) => {
+      transform: (_doc, ret: Record<string, unknown>) => {
         delete ret._id;
         delete ret.__v;
         return ret;
@@ -34,6 +34,11 @@ const dailyQuestSchema = new Schema<DailyQuestDocument>(
   }
 );
 dailyQuestSchema.index({ userId: 1, date: 1 });
+// Native MongoDB TTL index: Auto-delete quests older than 14 days
+dailyQuestSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 14 * 24 * 60 * 60 }
+);
 export const DailyQuestModel = mongoose.model<DailyQuestDocument>(
   'DailyQuest',
   dailyQuestSchema
@@ -60,13 +65,19 @@ const studySessionSchema = new Schema<StudySessionDocument>(
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret: any) => {
+      transform: (_doc, ret: Record<string, unknown>) => {
         delete ret._id;
         delete ret.__v;
         return ret;
       },
     },
   }
+);
+// Compound index for user study sessions and TTL index (auto-delete sessions older than 60 days)
+studySessionSchema.index({ userId: 1, studySetId: 1 });
+studySessionSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 60 * 24 * 60 * 60 }
 );
 export const StudySessionModel = mongoose.model<StudySessionDocument>(
   'StudySession',
@@ -93,7 +104,7 @@ const studyRoomSessionSchema = new Schema<StudyRoomSessionDocument>(
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret: any) => {
+      transform: (_doc, ret: Record<string, unknown>) => {
         delete ret._id;
         delete ret.__v;
         return ret;
@@ -102,6 +113,11 @@ const studyRoomSessionSchema = new Schema<StudyRoomSessionDocument>(
   }
 );
 studyRoomSessionSchema.index({ userId: 1, startedAt: 1 });
+// TTL index: Auto-delete study room sessions older than 60 days
+studyRoomSessionSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 60 * 24 * 60 * 60 }
+);
 export const StudyRoomSessionModel = mongoose.model<StudyRoomSessionDocument>(
   'StudyRoomSession',
   studyRoomSessionSchema
@@ -143,13 +159,19 @@ const testHistorySchema = new Schema<TestHistoryDocument>(
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret: any) => {
+      transform: (_doc, ret: Record<string, unknown>) => {
         delete ret._id;
         delete ret.__v;
         return ret;
       },
     },
   }
+);
+// Compound index for user test history & TTL index (auto-delete test histories older than 90 days)
+testHistorySchema.index({ userId: 1, studySetId: 1 });
+testHistorySchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 90 * 24 * 60 * 60 }
 );
 export const TestHistoryModel = mongoose.model<TestHistoryDocument>(
   'TestHistory',
@@ -179,7 +201,7 @@ const matchLeaderboardSchema = new Schema<MatchLeaderboardDocument>(
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret: any) => {
+      transform: (_doc, ret: Record<string, unknown>) => {
         delete ret._id;
         delete ret.__v;
         return ret;

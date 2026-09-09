@@ -598,6 +598,27 @@ export class AdminService {
       }
     }
 
+    // Delete test histories
+    for (const [hisId, his] of mockDb.testHistories.entries()) {
+      if (his.studySetId === setId) {
+        mockDb.testHistories.delete(hisId);
+      }
+    }
+
+    // Delete study sessions
+    for (const [sessId, sess] of mockDb.studySessions.entries()) {
+      if (sess.studySetId === setId) {
+        mockDb.studySessions.delete(sessId);
+      }
+    }
+
+    // Delete match leaderboards
+    for (const [mId, mEntry] of mockDb.matchLeaderboards.entries()) {
+      if (mEntry.studySetId === setId) {
+        mockDb.matchLeaderboards.delete(mId);
+      }
+    }
+
     // Delete study set
     mockDb.studySets.delete(setId);
 
@@ -832,4 +853,3 @@ export class AdminService {
     return updated;
   }
 }
-

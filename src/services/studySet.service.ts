@@ -246,6 +246,23 @@ export class StudySetService {
         set.dailyViews = {};
       }
       set.dailyViews[today] = (set.dailyViews[today] || 0) + 1;
+
+      // Database Optimization: Rolling window - keep only the last 30 days of dailyViews
+      const dateKeys = Object.keys(set.dailyViews);
+      if (dateKeys.length > 30) {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const cutoffDateStr = thirtyDaysAgo.toISOString().split('T')[0]!;
+
+        const trimmed: Record<string, number> = {};
+        for (const k of dateKeys) {
+          if (k >= cutoffDateStr) {
+            trimmed[k] = set.dailyViews[k]!;
+          }
+        }
+        set.dailyViews = trimmed;
+      }
+
       this.recentViews.set(viewDateKey, Date.now());
       mockDb.studySets.set(set.id, set);
     }
@@ -440,24 +457,66 @@ export class StudySetService {
       throw ApiError.forbidden('You can only delete your own study sets');
     }
 
-    // Delete set
+    // 1. Delete study set
     mockDb.studySets.delete(id);
 
-    // Delete associated cards
+    // 2. Cascade delete associated cards
     for (const [cardId, card] of mockDb.cards.entries()) {
       if (card.studySetId === id) {
         mockDb.cards.delete(cardId);
       }
     }
 
-    // Remove from folders
-    for (const folder of mockDb.folders.values()) {
-      folder.studySetIds = folder.studySetIds.filter((sId) => sId !== id);
+    // 3. Cascade delete user card progress
+    for (const [progId, prog] of mockDb.userCardProgress.entries()) {
+      if (prog.studySetId === id) {
+        mockDb.userCardProgress.delete(progId);
+      }
     }
 
-    // Remove from classes
+    // 4. Cascade delete test histories
+    for (const [hisId, his] of mockDb.testHistories.entries()) {
+      if (his.studySetId === id) {
+        mockDb.testHistories.delete(hisId);
+      }
+    }
+
+    // 5. Cascade delete study sessions
+    for (const [sessId, sess] of mockDb.studySessions.entries()) {
+      if (sess.studySetId === id) {
+        mockDb.studySessions.delete(sessId);
+      }
+    }
+
+    // 6. Cascade delete match leaderboards
+    for (const [mId, mEntry] of mockDb.matchLeaderboards.entries()) {
+      if (mEntry.studySetId === id) {
+        mockDb.matchLeaderboards.delete(mId);
+      }
+    }
+
+    // 7. Remove from folders
+    for (const folder of mockDb.folders.values()) {
+      if (folder.studySetIds && folder.studySetIds.includes(id)) {
+        folder.studySetIds = folder.studySetIds.filter((sId) => sId !== id);
+        mockDb.folders.set(folder.id, folder);
+      }
+    }
+
+    // 8. Remove from classes
     for (const cl of mockDb.classes.values()) {
-      cl.studySetIds = cl.studySetIds.filter((sId) => sId !== id);
+      if (cl.studySetIds && cl.studySetIds.includes(id)) {
+        cl.studySetIds = cl.studySetIds.filter((sId) => sId !== id);
+        mockDb.classes.set(cl.id, cl);
+      }
+    }
+
+    // 9. Remove from bookmarked study sets of users
+    for (const u of mockDb.users.values()) {
+      if (u.bookmarkedSetIds && u.bookmarkedSetIds.includes(id)) {
+        u.bookmarkedSetIds = u.bookmarkedSetIds.filter((sId) => sId !== id);
+        mockDb.users.set(u.id, u);
+      }
     }
   }
 

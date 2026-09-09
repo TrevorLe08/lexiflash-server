@@ -264,7 +264,8 @@ export class TestService {
       if (q.type === QuestionType.TRUE_FALSE) {
         const normalizeTf = (val: string): 'true' | 'false' | null => {
           const s = val.trim().toLowerCase();
-          if (['true', 't', 'đúng', 'dung', 'yes', '1'].includes(s)) return 'true';
+          if (['true', 't', 'đúng', 'dung', 'yes', '1'].includes(s))
+            return 'true';
           if (['false', 'f', 'sai', 'no', '0'].includes(s)) return 'false';
           return null;
         };
@@ -359,6 +360,24 @@ export class TestService {
     };
 
     mockDb.testHistories.set(testHistory.id, testHistory);
+
+    // Database Optimization: Keep at most 10 recent test histories per user per study set
+    const userSetHistories: TestHistory[] = [];
+    for (const h of mockDb.testHistories.values()) {
+      if (h.userId === userId && h.studySetId === studySetId) {
+        userSetHistories.push(h);
+      }
+    }
+    if (userSetHistories.length > 10) {
+      userSetHistories.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+      const toRemove = userSetHistories.slice(0, userSetHistories.length - 10);
+      for (const old of toRemove) {
+        mockDb.testHistories.delete(old.id);
+      }
+    }
 
     // Record study session
     await SrsService.recordSession(userId, {

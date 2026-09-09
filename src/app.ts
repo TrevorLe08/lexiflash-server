@@ -24,6 +24,21 @@ export const createApp = (): Express => {
   // Trust proxy for Render/Vercel reverse proxies (vital for rate-limiting by client IP)
   app.set('trust proxy', 1);
 
+  // OWASP Recommended Security Headers
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '0');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    if (ENV.NODE_ENV === 'production') {
+      res.setHeader(
+        'Strict-Transport-Security',
+        'max-age=31536000; includeSubDomains'
+      );
+    }
+    next();
+  });
+
   // Strict CORS policy
   const allowedOrigins = [
     ENV.CLIENT_URL,
@@ -116,7 +131,7 @@ export const createApp = (): Express => {
           ]);
           await seedDefaultDataIfEmpty();
           await mockDb.loadFromMongo();
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error('Error resetting MongoDB Atlas:', err);
         }
       }

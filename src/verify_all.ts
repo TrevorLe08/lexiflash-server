@@ -19,6 +19,7 @@ import { StudySetWithDetails } from '../src/types/studySet.types.js';
 import { ClassWithDetails } from '../src/types/class.types.js';
 import { StreakInfo, User } from '../src/types/user.types.js';
 import { AdminOverviewStats } from '../src/services/admin.service.js';
+import { DEFAULT_MAINTENANCE_CONFIG } from '../src/types/system.types.js';
 import http from 'http';
 
 interface ApiResponsePayload<T> {
@@ -36,6 +37,12 @@ async function runVerification() {
   if (mongo) {
     await mockDb.loadFromMongo();
   }
+
+  // Ensure maintenance mode does not block test authentication
+  mockDb.maintenanceConfig = {
+    ...DEFAULT_MAINTENANCE_CONFIG,
+    isActive: false,
+  };
 
   // Start ephemeral HTTP server for live API tests
   const app = createApp();

@@ -52,20 +52,32 @@ export const DEFAULT_FEATURED_TOPICS: string[] = [
   'Communication',
 ];
 
+export interface MongooseModelSyncable {
+  modelName: string;
+  updateOne(
+    filter: unknown,
+    update: unknown,
+    options?: unknown
+  ): { catch(callback: (err: unknown) => void): unknown };
+  deleteOne(filter: unknown): {
+    catch(callback: (err: unknown) => void): unknown;
+  };
+}
+
 /**
  * SyncedMap extends standard JavaScript Map to provide:
  * 1. O(1) in-memory lookups for blazing-fast reads.
  * 2. Automatic, asynchronous write-through persistence to MongoDB Atlas.
  */
 export class SyncedMap<T extends { id: string }> extends Map<string, T> {
-  private model: any;
+  private model?: MongooseModelSyncable;
 
-  constructor(model?: any) {
+  constructor(model?: MongooseModelSyncable) {
     super();
     this.model = model;
   }
 
-  public setModel(model: any) {
+  public setModel(model: MongooseModelSyncable) {
     this.model = model;
   }
 
@@ -77,16 +89,17 @@ export class SyncedMap<T extends { id: string }> extends Map<string, T> {
   override set(key: string, value: T): this {
     super.set(key, value);
     if (this.model && isMongoConnected()) {
-      const plain = { ...value };
-      delete (plain as any)._id;
-      delete (plain as any).__v;
+      const plain: Record<string, unknown> = { ...value };
+      delete plain._id;
+      delete plain.__v;
       this.model
         .updateOne({ id: key }, { $set: plain }, { upsert: true })
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           if (isMongoConnected()) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
             console.error(
-              `[MongoSync] Error upserting to ${this.model.modelName}:`,
-              err.message
+              `[MongoSync] Error upserting to ${this.model?.modelName}:`,
+              errorMsg
             );
           }
         });
@@ -97,11 +110,12 @@ export class SyncedMap<T extends { id: string }> extends Map<string, T> {
   override delete(key: string): boolean {
     const res = super.delete(key);
     if (this.model && isMongoConnected()) {
-      this.model.deleteOne({ id: key }).catch((err: any) => {
+      this.model.deleteOne({ id: key }).catch((err: unknown) => {
         if (isMongoConnected()) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
           console.error(
-            `[MongoSync] Error deleting from ${this.model.modelName}:`,
-            err.message
+            `[MongoSync] Error deleting from ${this.model?.modelName}:`,
+            errorMsg
           );
         }
       });
@@ -320,38 +334,38 @@ class MockDatabase {
 
       if (
         featuredTopicsSetting &&
-        Array.isArray((featuredTopicsSetting as any).value) &&
-        (featuredTopicsSetting as any).value.length > 0
+        Array.isArray(featuredTopicsSetting.value) &&
+        featuredTopicsSetting.value.length > 0
       ) {
-        this.featuredTopics = [...(featuredTopicsSetting as any).value];
+        this.featuredTopics = [...(featuredTopicsSetting.value as string[])];
       }
 
       if (
         bannerNotificationSetting &&
-        (bannerNotificationSetting as any).value &&
-        typeof (bannerNotificationSetting as any).value === 'object'
+        bannerNotificationSetting.value &&
+        typeof bannerNotificationSetting.value === 'object'
       ) {
         this.bannerNotification = {
           ...DEFAULT_BANNER_NOTIFICATION,
-          ...(bannerNotificationSetting as any).value,
+          ...(bannerNotificationSetting.value as Partial<BannerNotificationConfig>),
         };
       }
 
       if (
         maintenanceSetting &&
-        (maintenanceSetting as any).value &&
-        typeof (maintenanceSetting as any).value === 'object'
+        maintenanceSetting.value &&
+        typeof maintenanceSetting.value === 'object'
       ) {
         this.maintenanceConfig = {
           ...DEFAULT_MAINTENANCE_CONFIG,
-          ...(maintenanceSetting as any).value,
+          ...(maintenanceSetting.value as Partial<MaintenanceConfig>),
         };
       }
 
       this.users.clear();
       const todayStr = new Date().toISOString().split('T')[0]!;
       for (const u of users) {
-        const userObj = { ...(u as any) };
+        const userObj = { ...(u as unknown as User) };
         if (userObj.lastStudyDate) {
           const a = new Date(todayStr);
           const b = new Date(userObj.lastStudyDate.split('T')[0]!);
@@ -380,52 +394,62 @@ class MockDatabase {
 
       this.studySets.clear();
       for (const s of sets) {
-        this.studySets.rawSet((s as any).id, s as any);
+        const setObj = s as unknown as StudySet;
+        this.studySets.rawSet(setObj.id, setObj);
       }
 
       this.cards.clear();
       for (const c of cards) {
-        this.cards.rawSet((c as any).id, c as any);
+        const cardObj = c as unknown as Card;
+        this.cards.rawSet(cardObj.id, cardObj);
       }
 
       this.folders.clear();
       for (const f of folders) {
-        this.folders.rawSet((f as any).id, f as any);
+        const folderObj = f as unknown as Folder;
+        this.folders.rawSet(folderObj.id, folderObj);
       }
 
       this.classes.clear();
       for (const cl of classes) {
-        this.classes.rawSet((cl as any).id, cl as any);
+        const classObj = cl as unknown as ClassGroup;
+        this.classes.rawSet(classObj.id, classObj);
       }
 
       this.userCardProgress.clear();
       for (const p of progress) {
-        this.userCardProgress.rawSet((p as any).id, p as any);
+        const progObj = p as unknown as UserCardProgress;
+        this.userCardProgress.rawSet(progObj.id, progObj);
       }
 
       this.dailyQuests.clear();
       for (const q of quests) {
-        this.dailyQuests.rawSet((q as any).id, q as any);
+        const questObj = q as unknown as DailyQuest;
+        this.dailyQuests.rawSet(questObj.id, questObj);
       }
 
       this.studySessions.clear();
       for (const s of sessions) {
-        this.studySessions.rawSet((s as any).id, s as any);
+        const sessionObj = s as unknown as StudySession;
+        this.studySessions.rawSet(sessionObj.id, sessionObj);
       }
 
       this.testHistories.clear();
       for (const t of tests) {
-        this.testHistories.rawSet((t as any).id, t as any);
+        const testObj = t as unknown as TestHistory;
+        this.testHistories.rawSet(testObj.id, testObj);
       }
 
       this.matchLeaderboards.clear();
       for (const l of leaderboards) {
-        this.matchLeaderboards.rawSet((l as any).id, l as any);
+        const leadObj = l as unknown as MatchLeaderboardEntry;
+        this.matchLeaderboards.rawSet(leadObj.id, leadObj);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
       console.error(
         '❌ [MongoDB] Error hydrating cache from MongoDB Atlas:',
-        err.message
+        errorMsg
       );
     }
   }
@@ -439,10 +463,11 @@ class MockDatabase {
           { key: 'featuredTopics', value: this.featuredTopics },
           { upsert: true, returnDocument: 'after' }
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
         console.error(
           '[MongoSync] Error saving featuredTopics setting:',
-          err.message
+          errorMsg
         );
       }
     }
@@ -460,10 +485,11 @@ class MockDatabase {
           { key: 'bannerNotification', value: this.bannerNotification },
           { upsert: true, returnDocument: 'after' }
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
         console.error(
           '[MongoSync] Error saving bannerNotification setting:',
-          err.message
+          errorMsg
         );
       }
     }
@@ -481,10 +507,11 @@ class MockDatabase {
           { key: 'maintenanceConfig', value: this.maintenanceConfig },
           { upsert: true, returnDocument: 'after' }
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
         console.error(
           '[MongoSync] Error saving maintenanceConfig setting:',
-          err.message
+          errorMsg
         );
       }
     }
@@ -498,7 +525,7 @@ class MockDatabase {
       this.users.clear();
       const todayStr = new Date().toISOString().split('T')[0]!;
       for (const u of users) {
-        const userObj = { ...(u as any) };
+        const userObj = { ...(u as unknown as User) };
         if (userObj.lastStudyDate) {
           const a = new Date(todayStr);
           const b = new Date(userObj.lastStudyDate.split('T')[0]!);
@@ -524,11 +551,9 @@ class MockDatabase {
         }
         this.users.rawSet(userObj.id, userObj);
       }
-    } catch (err: any) {
-      console.warn(
-        '[MongoSync] Error syncing users from MongoDB:',
-        err.message
-      );
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.warn('[MongoSync] Error syncing users from MongoDB:', errorMsg);
     }
   }
 

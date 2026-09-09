@@ -6,6 +6,13 @@ import { ClassModel } from '../models/Class.model.js';
 import { UserCardProgressModel } from '../models/UserCardProgress.model.js';
 import { SystemSettingModel } from '../models/SystemSetting.model.js';
 import {
+  DailyQuestModel,
+  StudySessionModel,
+  StudyRoomSessionModel,
+  TestHistoryModel,
+  MatchLeaderboardModel,
+} from '../models/StudyRoom.model.js';
+import {
   DEFAULT_BANNER_NOTIFICATION,
   DEFAULT_MAINTENANCE_CONFIG,
 } from '../types/system.types.js';
@@ -203,12 +210,111 @@ export async function autoMigrateDatabase(): Promise<{
       });
     }
 
+    // 8. Auto-Optimization & Storage Protection: Register TTL indexes on Atlas
     console.log(
-      '✅ [DB Migration] All database collections are fully synced and compatible with Backend v2!'
+      '🧹 [DB Optimization] Synchronizing TTL indexes & cleaning up storage bloat...'
+    );
+    await Promise.allSettled([
+      DailyQuestModel.createIndexes(),
+      StudySessionModel.createIndexes(),
+      StudyRoomSessionModel.createIndexes(),
+      TestHistoryModel.createIndexes(),
+      UserCardProgressModel.createIndexes(),
+      CardModel.createIndexes(),
+      StudySetModel.createIndexes(),
+      UserModel.createIndexes(),
+    ]);
+
+    // 9. Cascade Orphan Data Purge: Delete cards, progress, sessions, and histories belonging to non-existent sets
+    const existingSets = await StudySetModel.find({}, { id: 1 }).lean();
+    const existingSetIds = new Set(existingSets.map((s) => s.id));
+
+    if (existingSetIds.size > 0) {
+      const validIds = Array.from(existingSetIds);
+      const orphanCards = await CardModel.deleteMany({
+        studySetId: { $nin: validIds },
+      });
+      const orphanProg = await UserCardProgressModel.deleteMany({
+        studySetId: { $nin: validIds },
+      });
+      const orphanHistories = await TestHistoryModel.deleteMany({
+        studySetId: { $nin: validIds },
+      });
+      const orphanSessions = await StudySessionModel.deleteMany({
+        studySetId: { $nin: validIds },
+      });
+      const orphanLeaderboard = await MatchLeaderboardModel.deleteMany({
+        studySetId: { $nin: validIds },
+      });
+
+      const totalOrphans =
+        (orphanCards.deletedCount || 0) +
+        (orphanProg.deletedCount || 0) +
+        (orphanHistories.deletedCount || 0) +
+        (orphanSessions.deletedCount || 0) +
+        (orphanLeaderboard.deletedCount || 0);
+
+      if (totalOrphans > 0) {
+        console.log(
+          `🧹 [DB Optimization] Purged ${totalOrphans} orphan records from deleted sets.`
+        );
+      }
+    }
+
+    // 10. Purge expired DailyQuests older than 14 days
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const cutoffDateStr = fourteenDaysAgo.toISOString().split('T')[0]!;
+    const deletedQuests = await DailyQuestModel.deleteMany({
+      date: { $lt: cutoffDateStr },
+    });
+    if ((deletedQuests.deletedCount || 0) > 0) {
+      console.log(
+        `🧹 [DB Optimization] Purged ${deletedQuests.deletedCount} expired daily quests older than 14 days.`
+      );
+    }
+
+    // 11. Trim dailyViews in StudySets: Rolling 30-day window
+    const setsWithDailyViews = await StudySetModel.find({
+      dailyViews: { $exists: true, $ne: {} },
+    });
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const viewCutoffStr = thirtyDaysAgo.toISOString().split('T')[0]!;
+    let trimmedSetsCount = 0;
+
+    for (const s of setsWithDailyViews) {
+      const dailyMap = s.dailyViews as Record<string, number> | undefined;
+      if (dailyMap && typeof dailyMap === 'object') {
+        const keys = Object.keys(dailyMap);
+        const hasOldKeys = keys.some((k) => k < viewCutoffStr);
+        if (hasOldKeys) {
+          const trimmed: Record<string, number> = {};
+          for (const k of keys) {
+            if (k >= viewCutoffStr) {
+              trimmed[k] = dailyMap[k]!;
+            }
+          }
+          s.dailyViews = trimmed;
+          s.markModified('dailyViews');
+          await s.save();
+          trimmedSetsCount++;
+        }
+      }
+    }
+    if (trimmedSetsCount > 0) {
+      console.log(
+        `🧹 [DB Optimization] Compacted dailyViews rolling window for ${trimmedSetsCount} study sets.`
+      );
+    }
+
+    console.log(
+      '✅ [DB Migration] All database collections are fully synced, optimized, and protected against storage bloat!'
     );
     return {
       success: true,
-      message: 'All collections verified and synced with Backend v2 schema.',
+      message:
+        'All collections verified, indexed, and storage optimization completed.',
     };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -217,5 +323,33 @@ export async function autoMigrateDatabase(): Promise<{
       success: false,
       message: msg,
     };
+  }
+}
+
+let maintenanceInterval: ReturnType<typeof globalThis.setInterval> | null =
+  null;
+
+/**
+ * Starts a recurring 24-hour maintenance background scheduler.
+ * Keeps production database perpetually lean without manual intervention.
+ */
+export function startDatabaseMaintenanceScheduler(): void {
+  if (maintenanceInterval) return;
+  // Run once every 24 hours
+  maintenanceInterval = globalThis.setInterval(
+    () => {
+      autoMigrateDatabase().catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('⚠️ [DB Maintenance] Scheduled maintenance error:', msg);
+      });
+    },
+    24 * 60 * 60 * 1000
+  );
+  if (
+    maintenanceInterval &&
+    typeof (maintenanceInterval as unknown as { unref?: () => void }).unref ===
+      'function'
+  ) {
+    (maintenanceInterval as unknown as { unref: () => void }).unref();
   }
 }

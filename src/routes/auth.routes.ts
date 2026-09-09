@@ -25,8 +25,7 @@ const loginLimiter = createRateLimiter({
 const registerLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 15,
-  message:
-    'Bạn đã thử đăng ký quá 15 lần. Vui lòng thử lại sau 15 phút!',
+  message: 'Bạn đã thử đăng ký quá 15 lần. Vui lòng thử lại sau 15 phút!',
 });
 
 // Anti email spam for password reset: 5 requests per 15 minutes
@@ -35,6 +34,14 @@ const forgotPasswordLimiter = createRateLimiter({
   max: 5,
   message:
     'Bạn đã yêu cầu gửi email quá nhiều lần. Vui lòng chờ 15 phút trước khi thử lại!',
+});
+
+// Anti brute-force for reset-password attempts: 10 attempts per 15 minutes
+const resetPasswordLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message:
+    'Bạn đã thử đặt lại mật khẩu quá nhiều lần. Vui lòng chờ 15 phút trước khi thử lại!',
 });
 
 router.post(
@@ -71,6 +78,7 @@ router.post(
 );
 router.post(
   '/reset-password',
+  resetPasswordLimiter,
   validate(resetPasswordSchema),
   AuthController.resetPassword
 );
